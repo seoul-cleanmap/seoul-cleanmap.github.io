@@ -476,6 +476,40 @@
 
     .lm-btn-secondary:hover { color: #444; }
 
+    /* ── 동 집계 버블 ── */
+    .dong-bubble {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      background: rgba(30, 90, 58, 0.88);
+      color: white;
+      border-radius: 14px;
+      padding: 7px 14px;
+      text-align: center;
+      border: 2px solid rgba(255,255,255,0.7);
+      box-shadow: 0 3px 14px rgba(0,0,0,0.22);
+      cursor: pointer;
+      white-space: nowrap;
+      backdrop-filter: blur(2px);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .dong-bubble:hover {
+      transform: translate(-50%, -50%) scale(1.08);
+      box-shadow: 0 5px 18px rgba(0,0,0,0.3);
+    }
+
+    .dong-bubble .d-name {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+
+    .dong-bubble .d-count {
+      font-size: 11px;
+      opacity: 0.85;
+      margin-top: 2px;
+    }
+
     /* 모바일 */
     @media (max-width: 680px) {
       :root { --panel-w: 0px; }
@@ -537,7 +571,7 @@
         📍 내 위치 버튼으로 <strong>가장 가까운 쓰레기통</strong>을 찾을 수 있어요.
       </div>
 
-      <button id="locate-btn">📍 내 위치에서 가장 가까운 쓰레기통 찾기</button>
+      <button id="locate-btn">📍 가까운 쓰레기통 찾기</button>
 
       <div id="nearest-card">
         <div class="nc-label">가장 가까운 쓰레기통</div>
@@ -633,13 +667,17 @@
   }).addTo(map);
 
   // ── 상태 ─────────────────────────────────────────────
-  let allData       = [];
-  let markerCluster = null;
-  let myMarker      = null;
-  let userLatLng    = null;
-  let nearestItem   = null;
+  let allData          = [];
+  let markerCluster    = null;
+  let dongLayer        = null;
+  let myMarker         = null;
+  let userLatLng       = null;
+  let nearestItem      = null;
   let nearestMarkerRef = null;
   let latField = null, lonField = null, addrField = null;
+
+  // 줌 < DONG_THRESHOLD → 동 버블 / 줌 >= DONG_THRESHOLD → 개별 핀
+  const DONG_THRESHOLD = 14;
 
   // ── SVG 핀 아이콘 생성 ────────────────────────────────
   function makePinSVG(color = '#2e7d52', highlight = false) {
@@ -776,7 +814,66 @@
 
   document.getElementById('detail-back').addEventListener('click', showDefault);
 
-  // ── 마커 렌더링 ──────────────────────────────────────
+  // ── 동 단위 집계 레이어 생성 ────────────────────────
+  function buildDongLayer() {
+    if (dongLayer) map.removeLayer(dongLayer);
+    dongLayer = L.layerGroup();
+
+    const groups = {};
+    for (const item of allData) {
+      const addr = addrField ? (item[addrField] || '') : '';
+      const match = addr.match(/([가-힣]+동)/);
+      const dong = match ? match[1] : null;
+      if (!dong) continue;
+
+      const lat = parseFloat(item[latField]);
+      const lon = parseFloat(item[lonField]);
+      if (isNaN(lat) || isNaN(lon)) continue;
+
+      if (!groups[dong]) groups[dong] = { latSum: 0, lonSum: 0, count: 0 };
+      groups[dong].latSum += lat;
+      groups[dong].lonSum += lon;
+      groups[dong].count++;
+    }
+
+    for (const [dong, g] of Object.entries(groups)) {
+      const lat = g.latSum / g.count;
+      const lon = g.lonSum / g.count;
+
+      const icon = L.divIcon({
+        html: `<div class="dong-bubble">
+          <div class="d-name">${dong}</div>
+          <div class="d-count">🗑️ ${g.count}개</div>
+        </div>`,
+        className: '',
+        iconSize: [1, 1],
+        iconAnchor: [0, 0],
+      });
+
+      const m = L.marker([lat, lon], { icon });
+      // 클릭하면 해당 동으로 줌인 (개별 핀 레벨)
+      m.on('click', () => {
+        map.flyTo([lat, lon], DONG_THRESHOLD, { duration: 0.8 });
+      });
+      dongLayer.addLayer(m);
+    }
+  }
+
+  // ── 줌 기반 레이어 전환 ───────────────────────────────
+  function updateLayers() {
+    const zoom = map.getZoom();
+    if (zoom < DONG_THRESHOLD) {
+      if (dongLayer      && !map.hasLayer(dongLayer))      map.addLayer(dongLayer);
+      if (markerCluster  &&  map.hasLayer(markerCluster))  map.removeLayer(markerCluster);
+    } else {
+      if (dongLayer      &&  map.hasLayer(dongLayer))      map.removeLayer(dongLayer);
+      if (markerCluster  && !map.hasLayer(markerCluster))  map.addLayer(markerCluster);
+    }
+  }
+
+  map.on('zoomend', updateLayers);
+
+  // ── 개별 핀 마커 렌더링 ──────────────────────────────
   function renderMarkers(highlightItem = null) {
     if (markerCluster) map.removeLayer(markerCluster);
     nearestMarkerRef = null;
@@ -810,7 +907,6 @@
         zIndexOffset: isHighlight ? 1000 : 0,
       });
 
-      // 호버 툴팁 (커서 이동하면 자동으로 사라짐)
       marker.bindTooltip(addr, {
         permanent: false,
         direction: 'top',
@@ -819,18 +915,17 @@
         className: 'trash-tooltip',
       });
 
-      // 클릭 → 사이드 패널 상세 화면
       marker.on('click', () => {
         showDetail(item);
         map.panTo([lat, lon], { animate: true, duration: 0.5 });
       });
 
       markerCluster.addLayer(marker);
-
       if (isHighlight) nearestMarkerRef = marker;
     }
 
-    map.addLayer(markerCluster);
+    // 레이어 추가는 updateLayers()가 줌 상태에 따라 결정
+    updateLayers();
   }
 
   // ── 가장 가까운 쓰레기통 ──────────────────────────────
@@ -904,6 +999,7 @@
 
       document.getElementById('stat-total').textContent = allData.length.toLocaleString() + '개';
       document.getElementById('loading').style.display = 'none';
+      buildDongLayer();
       renderMarkers();
       // 데이터 로드 완료 후 위치 동의 모달 표시
       showLocationModal();
@@ -926,13 +1022,13 @@
     document.getElementById('locate-btn').textContent = '위치 확인 중...';
     navigator.geolocation.getCurrentPosition(
       pos => {
-        document.getElementById('locate-btn').innerHTML = '📍 내 위치에서 가장 가까운 쓰레기통 찾기';
+        document.getElementById('locate-btn').innerHTML = '📍 가까운 쓰레기통 찾기';
         const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
         map.flyTo(latlng, 16, { duration: 1.5 });
         onLocate(latlng);
       },
       () => {
-        document.getElementById('locate-btn').innerHTML = '📍 내 위치에서 가장 가까운 쓰레기통 찾기';
+        document.getElementById('locate-btn').innerHTML = '📍 가까운 쓰레기통 찾기';
         alert('위치 권한을 허용해주세요.');
       },
       { enableHighAccuracy: true, timeout: 10000 }
