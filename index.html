@@ -380,6 +380,102 @@
       100% { box-shadow: 0 0 0 0 rgba(21,101,192,0); }
     }
 
+    /* ── 위치 동의 모달 ── */
+    #location-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    #location-modal .lm-box {
+      background: white;
+      border-radius: 24px;
+      padding: 32px 28px 24px;
+      max-width: 360px;
+      width: calc(100% - 40px);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    .lm-icon {
+      font-size: 44px;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    .lm-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #1a1a1a;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .lm-desc {
+      font-size: 13px;
+      color: #555;
+      text-align: center;
+      line-height: 1.7;
+      margin-bottom: 10px;
+    }
+
+    .lm-privacy {
+      font-size: 11px;
+      color: #aaa;
+      text-align: center;
+      line-height: 1.6;
+      background: #fafafa;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 20px;
+    }
+
+    .lm-btn-primary {
+      width: 100%;
+      padding: 14px;
+      background: var(--green);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: background 0.15s;
+    }
+
+    .lm-btn-primary:hover { background: #256644; }
+
+    .lm-btn-secondary {
+      width: 100%;
+      padding: 12px;
+      background: none;
+      color: #888;
+      border: none;
+      border-radius: 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .lm-btn-secondary:hover { color: #444; }
+
     /* 모바일 */
     @media (max-width: 680px) {
       :root { --panel-w: 0px; }
@@ -478,6 +574,25 @@
       <div class="detail-fields" id="detail-fields"></div>
     </div>
 
+  </div>
+</div>
+
+<!-- 위치 동의 모달 -->
+<div id="location-modal" style="display:none;">
+  <div class="lm-box">
+    <div class="lm-icon">📍</div>
+    <div class="lm-title">내 위치를 사용할까요?</div>
+    <div class="lm-desc">
+      현재 위치를 기반으로<br>
+      <strong>가장 가까운 쓰레기통</strong>을 찾아드릴게요.
+    </div>
+    <div class="lm-privacy">
+      위치 정보는 가장 가까운 쓰레기통 계산에만 사용되며,<br>
+      서버에 저장되거나 외부로 전송되지 않습니다.<br>
+      페이지를 새로고침하면 정보가 사라집니다.
+    </div>
+    <button class="lm-btn-primary" id="lm-allow">위치 공유하기</button>
+    <button class="lm-btn-secondary" id="lm-deny">괜찮아요, 지도만 볼게요</button>
   </div>
 </div>
 
@@ -759,23 +874,6 @@
     };
   }
 
-  document.getElementById('locate-btn').addEventListener('click', () => {
-    if (!navigator.geolocation) return alert('위치 기능을 지원하지 않는 브라우저입니다.');
-    document.getElementById('locate-btn').textContent = '위치 확인 중...';
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        document.getElementById('locate-btn').innerHTML = '📍 내 위치에서 가장 가까운 쓰레기통 찾기';
-        const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
-        map.flyTo(latlng, 16, { duration: 1.5 });
-        onLocate(latlng);
-      },
-      () => {
-        document.getElementById('locate-btn').innerHTML = '📍 내 위치에서 가장 가까운 쓰레기통 찾기';
-        alert('위치 권한을 허용해주세요.');
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  });
 
   // ── API 로드 ──────────────────────────────────────────
   async function loadData() {
@@ -807,6 +905,8 @@
       document.getElementById('stat-total').textContent = allData.length.toLocaleString() + '개';
       document.getElementById('loading').style.display = 'none';
       renderMarkers();
+      // 데이터 로드 완료 후 위치 동의 모달 표시
+      showLocationModal();
 
     } catch (err) {
       console.error(err);
@@ -816,6 +916,44 @@
       document.getElementById('loading').style.display = 'flex';
     }
   }
+
+  // ── 위치 동의 모달 ──────────────────────────────────
+  function requestLocation() {
+    if (!navigator.geolocation) {
+      alert('이 브라우저는 위치 기능을 지원하지 않습니다.');
+      return;
+    }
+    document.getElementById('locate-btn').textContent = '위치 확인 중...';
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        document.getElementById('locate-btn').innerHTML = '📍 내 위치에서 가장 가까운 쓰레기통 찾기';
+        const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+        map.flyTo(latlng, 16, { duration: 1.5 });
+        onLocate(latlng);
+      },
+      () => {
+        document.getElementById('locate-btn').innerHTML = '📍 내 위치에서 가장 가까운 쓰레기통 찾기';
+        alert('위치 권한을 허용해주세요.');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  function showLocationModal() {
+    document.getElementById('location-modal').style.display = 'flex';
+  }
+
+  document.getElementById('lm-allow').addEventListener('click', () => {
+    document.getElementById('location-modal').style.display = 'none';
+    requestLocation();
+  });
+
+  document.getElementById('lm-deny').addEventListener('click', () => {
+    document.getElementById('location-modal').style.display = 'none';
+  });
+
+  // 패널의 내 위치 버튼은 모달 없이 바로 요청
+  document.getElementById('locate-btn').addEventListener('click', requestLocation);
 
   loadData();
 </script>
