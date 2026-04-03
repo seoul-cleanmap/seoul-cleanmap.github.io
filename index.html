@@ -593,7 +593,7 @@
     /* ── 지도 대시보드 ── */
     #map-dashboard {
       position: fixed;
-      bottom: 70px;
+      bottom: 100px;
       left: 10px;
       z-index: 400;
       background: rgba(255,255,255,0.85);
@@ -1096,7 +1096,7 @@
     markerCluster = L.markerClusterGroup({
       maxClusterRadius: 50,
       showCoverageOnHover: false,
-      spiderfyOnMaxZoom: true,
+      spiderfyOnMaxZoom: false,
       zoomToBoundsOnClick: false,
       iconCreateFunction(cluster) {
         const n = cluster.getChildCount();
