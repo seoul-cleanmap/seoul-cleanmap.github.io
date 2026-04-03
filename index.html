@@ -1036,43 +1036,38 @@
   }
 
 
-  // ── 단일 소스 로드 ──────────────────────────────────
-  async function fetchSource(src) {
-    const key = encodeURIComponent(SERVICE_KEY);
-    const firstRes  = await fetch(`${src.url}?page=1&perPage=1000&serviceKey=${key}`, { headers: { accept: '*/*' } });
-    const firstJson = await firstRes.json();
-    if (firstJson.code && firstJson.code < 0) throw new Error(`[${src.name}] ${firstJson.msg}`);
-
-    let data  = firstJson.data || [];
-    const total = firstJson.totalCount || firstJson.matchCount || 0;
-
-    if (total > 1000) {
-      const pages = Math.ceil(total / 1000);
-      const ps = [];
-      for (let p = 2; p <= pages; p++) {
-        ps.push(fetch(`${src.url}?page=${p}&perPage=1000&serviceKey=${key}`, { headers: { accept: '*/*' } }).then(r => r.json()));
-      }
-      const rest = await Promise.all(ps);
-      for (const r of rest) if (r.data) data = data.concat(r.data);
-    }
-
-    if (data.length > 0) detectFields(src, data[0]);
-    // 각 아이템에 소스 참조 태깅
-    data.forEach(item => item._src = src);
-    return data;
-  }
-
-  // ── API 로드 (모든 소스 병렬) ────────────────────────
+  // ── 데이터 로드 (사전 지오코딩된 data.json) ──────────
   async function loadData() {
     document.getElementById('loading').style.display = 'flex';
     try {
-      const results = await Promise.all(SOURCES.map(fetchSource));
-      allData = results.flat();
+      const res  = await fetch('./data.json');
+      const rows = await res.json();  // [{ district, label, road, lat, lon, detail }, ...]
 
-      // 구별 카운트 업데이트
+      // 각 행에 렌더링에 필요한 _src, _lat, _lon, _addr 주입
+      const srcByName = Object.fromEntries(SOURCES.map(s => [s.name, s]));
+
+      allData = rows.map(row => {
+        const src = srcByName[row.district] || SOURCES[0];
+        return Object.assign({}, row.detail, {
+          _src:  src,
+          _lat:  row.lat,
+          _lon:  row.lon,
+          _addr: row.label,
+          _road: row.road,
+        });
+      });
+
+      // src 필드 참조를 _lat/_lon/_addr 으로 통일
+      for (const src of SOURCES) {
+        src.latField  = '_lat';
+        src.lonField  = '_lon';
+        src.addrField = '_addr';
+      }
+
+      // 구별 카운트
       for (const src of SOURCES) {
         const cnt = allData.filter(d => d._src === src).length;
-        const el = document.getElementById(src.statId);
+        const el  = document.getElementById(src.statId);
         if (el) el.textContent = cnt.toLocaleString() + '개';
       }
 
