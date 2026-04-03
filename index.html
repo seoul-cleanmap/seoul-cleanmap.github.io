@@ -583,7 +583,7 @@
 <div id="map"></div>
 
 <!-- 패널 접기/펼치기 버튼 -->
-<button id="panel-toggle" title="패널 접기/펼치기">◀</button>
+<button id="panel-toggle" title="패널 접기/펼치기">▶</button>
 
 <!-- 사이드 패널 -->
 <div id="panel">
@@ -1132,7 +1132,7 @@
   const panelToggleBtn = document.getElementById('panel-toggle');
   panelToggleBtn.addEventListener('click', () => {
     const collapsed = document.body.classList.toggle('panel-collapsed');
-    panelToggleBtn.textContent = collapsed ? '▶' : '◀';
+    panelToggleBtn.textContent = collapsed ? '◀' : '▶';
     setTimeout(() => map.invalidateSize(), 360);
   });
 
