@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>강남구 쓰레기통 지도</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      background: #f0faf0;
+      overflow: hidden;
+    }
+
+    #map {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ── 상단 헤더 ── */
+    #header {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: white;
+      border-radius: 24px;
+      padding: 10px 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
+
+    #header .logo {
+      font-size: 22px;
+    }
+
+    #header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #2d6a4f;
+    }
+
+    #header .count {
+      font-size: 12px;
+      color: #888;
+      background: #f0faf0;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    /* ── 내 위치 버튼 ── */
+    #locate-btn {
+      position: fixed;
+      bottom: 140px;
+      right: 16px;
+      z-index: 1000;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: none;
+      background: white;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      cursor: pointer;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    #locate-btn:hover {
+      transform: scale(1.08);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    }
+
+    #locate-btn:active { transform: scale(0.95); }
+
+    /* ── 가장 가까운 쓰레기통 패널 ── */
+    #nearest-panel {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: white;
+      border-radius: 20px;
+      padding: 14px 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.14);
+      min-width: 300px;
+      max-width: calc(100vw - 32px);
+      display: none;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    #nearest-panel .panel-title {
+      font-size: 11px;
+      color: #888;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    #nearest-panel .panel-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #nearest-panel .panel-icon { font-size: 28px; }
+
+    #nearest-panel .panel-info { flex: 1; min-width: 0; }
+
+    #nearest-panel .panel-location {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #nearest-panel .panel-distance {
+      font-size: 13px;
+      color: #2d9970;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+
+    #nearest-panel .panel-go {
+      background: #2d9970;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+
+    #nearest-panel .panel-go:hover { background: #27865f; }
+
+    /* ── API 키 모달 ── */
+    #key-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #key-modal .modal-box {
+      background: white;
+      border-radius: 24px;
+      padding: 32px 28px;
+      max-width: 420px;
+      width: calc(100% - 32px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    #key-modal .modal-icon { font-size: 40px; text-align: center; margin-bottom: 12px; }
+
+    #key-modal h2 {
+      font-size: 18px;
+      color: #1a1a1a;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    #key-modal p {
+      font-size: 13px;
+      color: #666;
+      text-align: center;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    #key-modal p a {
+      color: #2d9970;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    #key-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      font-size: 13px;
+      font-family: monospace;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 10px;
+    }
+
+    #key-input:focus { border-color: #2d9970; }
+
+    #key-submit {
+      width: 100%;
+      padding: 13px;
+      background: #2d9970;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #key-submit:hover { background: #27865f; }
+
+    #key-error {
+      color: #e53935;
+      font-size: 12px;
+      text-align: center;
+      margin-top: 8px;
+      display: none;
+    }
+
+    /* ── 로딩 ── */
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 1500;
+      background: rgba(255,255,255,0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    #loading .spin { font-size: 40px; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #loading p { font-size: 14px; color: #555; }
+
+    /* ── Leaflet 커스텀 ── */
+    .leaflet-container { background: #e8f5e9; }
+
+    /* 쓰레기통 마커 */
+    .trash-marker {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      background: white;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: transform 0.2s;
+      cursor: pointer;
+      border: 2px solid #a5d6a7;
+    }
+
+    .trash-marker:hover { transform: scale(1.2); }
+
+    /* 가장 가까운 쓰레기통 마커 */
+    .trash-marker-nearest {
+      width: 44px;
+      height: 44px;
+      font-size: 26px;
+      background: #e8f5e9;
+      border: 3px solid #2d9970;
+      box-shadow: 0 0 0 0 rgba(45,153,112,0.4);
+      animation: pulse 1.5s ease-out infinite;
+    }
+
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(45,153,112,0.5); }
+      70%  { box-shadow: 0 0 0 14px rgba(45,153,112,0); }
+      100% { box-shadow: 0 0 0 0 rgba(45,153,112,0); }
+    }
+
+    /* 내 위치 마커 */
+    .my-location-dot {
+      width: 16px;
+      height: 16px;
+      background: #1976D2;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(25,118,210,0.5);
+    }
+
+    /* 클러스터 커스텀 */
+    .marker-cluster-small,
+    .marker-cluster-medium,
+    .marker-cluster-large {
+      background: rgba(45,153,112,0.2) !important;
+    }
+
+    .marker-cluster-small div,
+    .marker-cluster-medium div,
+    .marker-cluster-large div {
+      background: #2d9970 !important;
+      color: white !important;
+      font-weight: 700;
+    }
+
+    /* 팝업 커스텀 */
+    .leaflet-popup-content-wrapper {
+      border-radius: 14px !important;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.15) !important;
+    }
+
+    .leaflet-popup-content {
+      margin: 12px 16px !important;
+      font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+    }
+
+    .popup-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+    }
+
+    .popup-sub {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .popup-distance {
+      font-size: 12px;
+      color: #2d9970;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    /* 반응형 */
+    @media (max-width: 480px) {
+      #header h1 { font-size: 13px; }
+      #nearest-panel { min-width: unset; width: calc(100vw - 32px); }
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- 상단 헤더 -->
+<div id="header">
+  <span class="logo">🗑️</span>
+  <h1>강남구 쓰레기통 지도</h1>
+  <span class="count" id="count-badge">로딩 중...</span>
+</div>
+
+<!-- 내 위치 버튼 -->
+<button id="locate-btn" title="내 위치 찾기">📍</button>
+
+<!-- 가장 가까운 쓰레기통 패널 -->
+<div id="nearest-panel">
+  <div class="panel-title">가장 가까운 쓰레기통</div>
+  <div class="panel-row">
+    <span class="panel-icon">🗑️</span>
+    <div class="panel-info">
+      <div class="panel-location" id="nearest-location">-</div>
+      <div class="panel-distance" id="nearest-distance">-</div>
+    </div>
+    <button class="panel-go" id="nearest-go">지도에서 보기</button>
+  </div>
+</div>
+
+<!-- API 키 모달 -->
+<div id="key-modal">
+  <div class="modal-box">
+    <div class="modal-icon">🗑️</div>
+    <h2>공공데이터 API 키 입력</h2>
+    <p>
+      <a href="https://www.data.go.kr" target="_blank">data.go.kr</a>에서<br>
+      발급받은 서비스 키(Decoding)를 입력해주세요.<br>
+      키는 이 브라우저에만 저장됩니다.
+    </p>
+    <input type="text" id="key-input" placeholder="서비스 키를 붙여넣으세요..." />
+    <button id="key-submit">데이터 불러오기</button>
+    <div id="key-error">키가 올바르지 않거나 API 오류가 발생했습니다.</div>
+  </div>
+</div>
+
+<!-- 로딩 -->
+<div id="loading" style="display:none;">
+  <div class="spin">🗑️</div>
+  <p>쓰레기통 데이터를 불러오는 중...</p>
+</div>
+
+<script>
+  // ── 설정 ──────────────────────────────────────────────
+  const API_BASE = 'https://api.odcloud.kr/api/15038054/v1/uddi:bd7d78ba-ef6a-4865-8959-a14836e95ede';
+  const PER_PAGE = 1000;
+
+  // 가능한 좌표 필드명 (API 응답 확인 후 자동 매핑)
+  const LAT_FIELDS = ['위도', 'latitude', 'LAT', 'lat', 'Y좌표', 'y좌표', 'WGS84위도'];
+  const LON_FIELDS = ['경도', 'longitude', 'LON', 'lon', 'X좌표', 'x좌표', 'WGS84경도'];
+  const ADDR_FIELDS = ['설치위치', '주소', '도로명주소', '지번주소', '위치', '소재지'];
+
+  // ── 지도 초기화 ─────────────────────────────────────
+  const map = L.map('map', {
+    center: [37.5172, 127.0473],   // 강남구 중심
+    zoom: 14,
+    zoomControl: false,
+  });
+
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(map);
+
+  // ── 상태 변수 ──────────────────────────────────────
+  let allData = [];
+  let markerCluster = null;
+  let nearestMarker = null;
+  let myLocationMarker = null;
+  let userLatLng = null;
+  let latField = null, lonField = null, addrField = null;
+
+  // ── 마커 아이콘 ───────────────────────────────────
+  function makeIcon(isNearest = false) {
+    return L.divIcon({
+      html: `<div class="trash-marker ${isNearest ? 'trash-marker-nearest' : ''}">🗑️</div>`,
+      className: '',
+      iconSize: isNearest ? [44, 44] : [36, 36],
+      iconAnchor: isNearest ? [22, 22] : [18, 18],
+      popupAnchor: [0, isNearest ? -24 : -20],
+    });
+  }
+
+  const myIcon = L.divIcon({
+    html: `<div class="my-location-dot"></div>`,
+    className: '',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+
+  // ── 필드 자동 감지 ────────────────────────────────
+  function detectFields(sample) {
+    const keys = Object.keys(sample);
+    latField  = LAT_FIELDS.find(f => keys.includes(f)) || null;
+    lonField  = LON_FIELDS.find(f => keys.includes(f)) || null;
+    addrField = ADDR_FIELDS.find(f => keys.includes(f)) || null;
+
+    if (!latField || !lonField) {
+      // 숫자형 필드 중 강남구 위도(37.x) 범위인 것 자동 탐지
+      for (const k of keys) {
+        const v = parseFloat(sample[k]);
+        if (v > 37 && v < 38) latField  = latField  || k;
+        if (v > 126 && v < 128) lonField = lonField || k;
+      }
+    }
+
+    console.log('감지된 필드:', { latField, lonField, addrField, 전체키: keys });
+  }
+
+  // ── 거리 계산 (Haversine) ─────────────────────────
+  function distanceM(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) ** 2
+            + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function formatDistance(m) {
+    if (m < 1000) return `${Math.round(m)}m`;
+    return `${(m / 1000).toFixed(1)}km`;
+  }
+
+  // ── 마커 렌더링 ───────────────────────────────────
+  function renderMarkers(nearestItem = null) {
+    if (markerCluster) map.removeLayer(markerCluster);
+
+    markerCluster = L.markerClusterGroup({
+      maxClusterRadius: 50,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      iconCreateFunction(cluster) {
+        const n = cluster.getChildCount();
+        return L.divIcon({
+          html: `<div style="
+            background:#2d9970;color:white;font-weight:700;font-size:13px;
+            width:${n < 10 ? 36 : n < 100 ? 42 : 48}px;
+            height:${n < 10 ? 36 : n < 100 ? 42 : 48}px;
+            border-radius:50%;display:flex;align-items:center;justify-content:center;
+            box-shadow:0 2px 10px rgba(45,153,112,0.4);border:2px solid white;
+          ">${n}</div>`,
+          className: '',
+          iconSize: [48, 48],
+          iconAnchor: [24, 24],
+        });
+      },
+    });
+
+    for (const item of allData) {
+      const lat = parseFloat(item[latField]);
+      const lon = parseFloat(item[lonField]);
+      if (isNaN(lat) || isNaN(lon)) continue;
+
+      const addr = addrField ? (item[addrField] || '위치 정보 없음') : '위치 정보 없음';
+      const isNearest = nearestItem && item === nearestItem;
+
+      const marker = L.marker([lat, lon], { icon: makeIcon(isNearest) });
+
+      let popupHtml = `<div class="popup-title">${addr}</div>`;
+
+      // 추가 정보가 있으면 표시
+      const extraFields = Object.keys(item).filter(k =>
+        k !== latField && k !== lonField && k !== addrField &&
+        item[k] && String(item[k]).trim()
+      ).slice(0, 3);
+
+      for (const f of extraFields) {
+        popupHtml += `<div class="popup-sub">${f}: ${item[f]}</div>`;
+      }
+
+      if (userLatLng && !isNaN(lat) && !isNaN(lon)) {
+        const d = distanceM(userLatLng.lat, userLatLng.lng, lat, lon);
+        popupHtml += `<div class="popup-distance">📍 내 위치에서 ${formatDistance(d)}</div>`;
+      }
+
+      marker.bindPopup(popupHtml);
+      markerCluster.addLayer(marker);
+
+      if (isNearest) nearestMarker = marker;
+    }
+
+    map.addLayer(markerCluster);
+  }
+
+  // ── 가장 가까운 쓰레기통 찾기 ────────────────────
+  function findNearest(latlng) {
+    let minDist = Infinity;
+    let nearestItem = null;
+
+    for (const item of allData) {
+      const lat = parseFloat(item[latField]);
+      const lon = parseFloat(item[lonField]);
+      if (isNaN(lat) || isNaN(lon)) continue;
+
+      const d = distanceM(latlng.lat, latlng.lng, lat, lon);
+      if (d < minDist) {
+        minDist = d;
+        nearestItem = item;
+      }
+    }
+
+    return { item: nearestItem, dist: minDist };
+  }
+
+  function updateNearestPanel(item, dist) {
+    const panel = document.getElementById('nearest-panel');
+    const addr = addrField ? (item[addrField] || '주소 정보 없음') : '위치 정보 없음';
+    document.getElementById('nearest-location').textContent = addr;
+    document.getElementById('nearest-distance').textContent = `내 위치에서 ${formatDistance(dist)}`;
+    panel.style.display = 'block';
+
+    document.getElementById('nearest-go').onclick = () => {
+      const lat = parseFloat(item[latField]);
+      const lon = parseFloat(item[lonField]);
+      map.flyTo([lat, lon], 18, { duration: 1.2 });
+      setTimeout(() => {
+        if (nearestMarker) nearestMarker.openPopup();
+      }, 1300);
+    };
+  }
+
+  // ── 내 위치 ─────────────────────────────────────
+  function onLocate(latlng) {
+    userLatLng = latlng;
+
+    if (myLocationMarker) map.removeLayer(myLocationMarker);
+    myLocationMarker = L.marker(latlng, { icon: myIcon, zIndexOffset: 1000 })
+      .addTo(map)
+      .bindPopup('<div class="popup-title">내 위치</div>');
+
+    if (allData.length === 0) return;
+
+    const { item, dist } = findNearest(latlng);
+    if (!item) return;
+
+    renderMarkers(item);
+    updateNearestPanel(item, dist);
+  }
+
+  document.getElementById('locate-btn').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      alert('이 브라우저는 위치 기능을 지원하지 않습니다.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+        map.flyTo(latlng, 16, { duration: 1.5 });
+        onLocate(latlng);
+      },
+      err => {
+        alert('위치 정보를 가져올 수 없습니다. 브라우저 위치 권한을 확인해주세요.');
+        console.error(err);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+
+  // ── API 데이터 로드 ──────────────────────────────
+  async function loadData(serviceKey) {
+    document.getElementById('loading').style.display = 'flex';
+
+    try {
+      // 첫 페이지로 총 개수 파악
+      const firstUrl = `${API_BASE}?page=1&perPage=${PER_PAGE}&serviceKey=${encodeURIComponent(serviceKey)}`;
+      const firstRes = await fetch(firstUrl, { headers: { accept: '*/*' } });
+      const firstJson = await firstRes.json();
+
+      if (firstJson.code && firstJson.code < 0) {
+        throw new Error(firstJson.msg || 'API 오류');
+      }
+
+      const totalCount = firstJson.totalCount || firstJson.matchCount || 0;
+      let data = firstJson.data || [];
+
+      // 필드 감지
+      if (data.length > 0) detectFields(data[0]);
+
+      // 추가 페이지 병렬 로드
+      if (totalCount > PER_PAGE) {
+        const pages = Math.ceil(totalCount / PER_PAGE);
+        const promises = [];
+        for (let p = 2; p <= pages; p++) {
+          const url = `${API_BASE}?page=${p}&perPage=${PER_PAGE}&serviceKey=${encodeURIComponent(serviceKey)}`;
+          promises.push(fetch(url, { headers: { accept: '*/*' } }).then(r => r.json()));
+        }
+        const results = await Promise.all(promises);
+        for (const r of results) {
+          if (r.data) data = data.concat(r.data);
+        }
+      }
+
+      allData = data;
+      document.getElementById('count-badge').textContent = `${allData.length.toLocaleString()}개`;
+      localStorage.setItem('trash_map_key', serviceKey);
+
+      document.getElementById('loading').style.display = 'none';
+      renderMarkers();
+
+    } catch (err) {
+      console.error(err);
+      document.getElementById('loading').style.display = 'none';
+      throw err;
+    }
+  }
+
+  // ── API 키 모달 ──────────────────────────────────
+  function initKeyModal() {
+    const HARDCODED_KEY = 'f5bd6e169d4177d3b845f9b280f46416a1129d405cddbdf1ba8864dfbff36df4';
+    document.getElementById('key-modal').style.display = 'none';
+    loadData(HARDCODED_KEY).catch(() => {
+      document.getElementById('key-modal').style.display = 'flex';
+      document.getElementById('key-error').style.display = 'block';
+      document.getElementById('key-error').textContent = 'API 키 오류가 발생했습니다.';
+    });
+  }
+
+  document.getElementById('key-submit').addEventListener('click', async () => {
+    const key = document.getElementById('key-input').value.trim();
+    if (!key) return;
+
+    document.getElementById('key-submit').textContent = '불러오는 중...';
+    document.getElementById('key-submit').disabled = true;
+    document.getElementById('key-error').style.display = 'none';
+
+    try {
+      await loadData(key);
+      document.getElementById('key-modal').style.display = 'none';
+    } catch {
+      document.getElementById('key-error').style.display = 'block';
+      document.getElementById('key-error').textContent = '키가 올바르지 않거나 API 오류가 발생했습니다.';
+    } finally {
+      document.getElementById('key-submit').textContent = '데이터 불러오기';
+      document.getElementById('key-submit').disabled = false;
+    }
+  });
+
+  document.getElementById('key-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('key-submit').click();
+  });
+
+  // ── 시작 ─────────────────────────────────────────
+  initKeyModal();
+</script>
+</body>
+</html>
