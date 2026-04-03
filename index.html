@@ -665,9 +665,7 @@
     },
   ];
 
-  // 커스텀 마커 이미지를 사용하려면 아래 경로를 변경하세요.
-  // null 이면 기본 SVG 핀을 사용합니다.
-  const CUSTOM_ICON_URL = null;
+  const CUSTOM_ICON_URL = './icon.png';
 
   const LAT_FIELDS  = ['위도','latitude','LAT','lat','Y좌표','y좌표','WGS84위도','위도(EPSG4326)'];
   const LON_FIELDS  = ['경도','longitude','LON','lon','X좌표','x좌표','WGS84경도','경도(EPSG4326)'];
@@ -726,9 +724,9 @@
     if (CUSTOM_ICON_URL) {
       return L.icon({
         iconUrl: CUSTOM_ICON_URL,
-        iconSize: [36, 46],
-        iconAnchor: [18, 46],
-        tooltipAnchor: [0, -46],
+        iconSize:      highlight ? [48, 48] : [36, 36],
+        iconAnchor:    highlight ? [24, 48] : [18, 36],
+        tooltipAnchor: [0, highlight ? -48 : -36],
       });
     }
     return L.divIcon({
