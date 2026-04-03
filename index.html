@@ -5,11 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>강남구 쓰레기통 지도</title>
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=f16e173e938e0313897327562afd35cf&libraries=clusterer&autoload=false"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -64,15 +60,6 @@
       --toggle-bg: #2a2a2a;
       --nearest-border: #1e5c3a;
     }
-
-    /* Leaflet 컨트롤 다크모드 */
-    body.dark .leaflet-control-zoom a {
-      background-color: var(--toggle-bg);
-      color: var(--text-primary);
-      border-color: var(--border-strong);
-    }
-    body.dark .leaflet-control-zoom a:hover { background-color: var(--card-bg); }
-    body.dark .leaflet-bar { border-color: var(--border-strong); box-shadow: none; }
 
     body {
       font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
@@ -381,41 +368,6 @@
 
     #loading p { font-size: 13px; color: var(--text-secondary); }
 
-    /* ── 마커 SVG ── */
-    .trash-pin { cursor: pointer; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25)); }
-    .trash-pin:hover { filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35)); transform: scale(1.1); }
-
-    /* 클러스터 */
-    .custom-cluster {
-      background: var(--green);
-      color: white;
-      font-weight: 800;
-      font-size: 13px;
-      border-radius: 50%;
-      border: 3px solid white;
-      box-shadow: 0 2px 10px rgba(46,125,82,0.4);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* Leaflet 툴팁 커스텀 */
-    .trash-tooltip {
-      background: rgba(30,30,30,0.88) !important;
-      color: white !important;
-      border: none !important;
-      border-radius: 8px !important;
-      font-size: 12px !important;
-      font-weight: 600 !important;
-      padding: 6px 10px !important;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important;
-      white-space: nowrap;
-      max-width: 220px;
-      white-space: normal;
-    }
-
-    .trash-tooltip::before { display: none !important; }
-
     /* 내 위치 */
     .my-dot {
       width: 14px; height: 14px;
@@ -574,8 +526,7 @@
 
     /* ── 동 집계 버블 ── */
     .dong-bubble {
-      position: absolute;
-      transform: translate(-50%, -50%);
+      display: inline-block;
       background: rgba(30, 90, 58, 0.88);
       color: white;
       border-radius: 14px;
@@ -590,7 +541,7 @@
     }
 
     .dong-bubble:hover {
-      transform: translate(-50%, -50%) scale(1.08);
+      transform: scale(1.08);
       box-shadow: 0 5px 18px rgba(0,0,0,0.3);
     }
 
@@ -658,20 +609,17 @@
 
     /* ── 대시보드 배너 ── */
     #dash-banner-link {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: var(--card-bg);
-      padding: 6px 8px;
-      line-height: 0;
+      display: block;
       position: relative;
+      line-height: 0;
+      background: var(--dash-bg);
+      backdrop-filter: blur(8px);
     }
     #dash-banner-link img {
-      height: 72px;
-      width: auto;
-      max-width: 100%;
+      width: 100%;
+      height: 60px;
+      object-fit: contain;
       display: block;
-      border-radius: 6px;
       transition: opacity 0.15s;
     }
     #dash-banner-link:hover img { opacity: 0.85; }
@@ -914,51 +862,14 @@
 
 <script>
   // ── 설정 ─────────────────────────────────────────────
-  const SERVICE_KEY = 'f5bd6e169d4177d3b845f9b280f46416a1129d405cddbdf1ba8864dfbff36df4';
-
   const SOURCES = [
-    {
-      name: '강남구',
-      statId: 'stat-gangnam',
-      color: '#2e7d52',
-      pinInner: '#43a86d',
-      dongBg: 'rgba(30,90,58,0.88)',
-      url: 'https://api.odcloud.kr/api/15038054/v1/uddi:bd7d78ba-ef6a-4865-8959-a14836e95ede',
-      latField: null, lonField: null, addrField: null,
-    },
-    {
-      name: '송파구',
-      statId: 'stat-songpa',
-      color: '#1565C0',
-      pinInner: '#1976D2',
-      dongBg: 'rgba(21,60,130,0.88)',
-      url: 'https://api.odcloud.kr/api/15096706/v1/uddi:205421b7-9a46-4c8a-99b6-d4d3cae303d0',
-      latField: null, lonField: null, addrField: null,
-    },
+    { name: '강남구', statId: 'stat-gangnam', color: '#2e7d52', dongBg: 'rgba(30,90,58,0.88)' },
+    { name: '송파구', statId: 'stat-songpa',  color: '#1565C0', dongBg: 'rgba(21,60,130,0.88)' },
   ];
 
   const CUSTOM_ICON_URL = './icon.png';
-
-  const LAT_FIELDS  = ['위도','latitude','LAT','lat','Y좌표','y좌표','WGS84위도','위도(EPSG4326)'];
-  const LON_FIELDS  = ['경도','longitude','LON','lon','X좌표','x좌표','WGS84경도','경도(EPSG4326)'];
-  const ADDR_FIELDS = ['설치위치','주소','도로명주소','지번주소','위치','소재지','설치장소'];
-
-  // ── 지도 초기화 ──────────────────────────────────────
-  const map = L.map('map', {
-    center: [37.5050, 127.0900],
-    zoom: 14,
-    zoomControl: false,
-  });
-
-  L.control.zoom({ position: 'bottomleft' }).addTo(map);
-
-  const TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-  const TILE_DARK  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-  const TILE_ATTR  = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>';
-
-  const tileLayer = L.tileLayer(TILE_LIGHT, {
-    attribution: TILE_ATTR, subdomains: 'abcd', maxZoom: 19,
-  }).addTo(map);
+  // Kakao: 레벨 >= DONG_THRESHOLD → 동 버블 / 레벨 < DONG_THRESHOLD → 개별 핀
+  const DONG_THRESHOLD = 5;
 
   // ── 다크모드 ──────────────────────────────────────────
   const systemDark  = window.matchMedia('(prefers-color-scheme: dark)');
@@ -969,7 +880,6 @@
     localStorage.setItem('theme', theme);
     const dark = theme === 'dark' || (theme === 'system' && systemDark.matches);
     document.body.classList.toggle('dark', dark);
-    tileLayer.setUrl(dark ? TILE_DARK : TILE_LIGHT);
     document.querySelectorAll('.theme-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.theme === theme);
     });
@@ -978,22 +888,16 @@
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.addEventListener('click', () => applyTheme(btn.dataset.theme));
   });
-
-  systemDark.addEventListener('change', () => {
-    if (activeTheme === 'system') applyTheme('system');
-  });
-
+  systemDark.addEventListener('change', () => { if (activeTheme === 'system') applyTheme('system'); });
   applyTheme(activeTheme);
 
-  // ── 배너 클릭 카운터 (localStorage) ──────────────────
-  // 확인 방법: 브라우저 콘솔에서 bannerClicks() 실행
+  // ── 배너 클릭 카운터 ──────────────────────────────────
   document.getElementById('dash-banner-link').addEventListener('click', () => {
     const key  = 'eab_banner_clicks';
     const logs = JSON.parse(localStorage.getItem(key) || '[]');
     logs.push(new Date().toISOString());
     localStorage.setItem(key, JSON.stringify(logs));
   });
-
   window.bannerClicks = () => {
     const logs = JSON.parse(localStorage.getItem('eab_banner_clicks') || '[]');
     console.log(`배너 클릭 수 (이 브라우저): ${logs.length}회`);
@@ -1002,81 +906,16 @@
   };
 
   // ── 상태 ─────────────────────────────────────────────
-  let allData          = [];
-  let markerCluster    = null;
-  let dongLayer        = null;
-  let myMarker         = null;
-  let userLatLng       = null;
-  let nearestItem      = null;
-  let nearestMarkerRef = null;
-  let latField = null, lonField = null, addrField = null;
-  let listContext      = null;  // { items, title } — 리스트→상세 뒤로가기용
-
-  // 줌 < DONG_THRESHOLD → 동 버블 / 줌 >= DONG_THRESHOLD → 개별 핀
-  const DONG_THRESHOLD = 14;
-
-  // ── SVG 핀 아이콘 생성 ────────────────────────────────
-  function makePinSVG(color, innerColor, highlight = false) {
-    const inner = highlight ? '#fff176' : 'white';
-    const ic    = highlight ? '#e65100' : innerColor;
-    return `
-      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46" class="trash-pin">
-        <path d="M18 44 C18 44 4 30 4 18 A14 14 0 0 1 32 18 C32 30 18 44 18 44Z"
-              fill="${highlight ? '#e65100' : color}"
-              style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.28))"/>
-        <circle cx="18" cy="18" r="11" fill="${highlight ? '#ffee58' : ic}"/>
-        <rect x="14" y="10" width="8"  height="3"  rx="1.5" fill="${inner}" opacity="0.95"/>
-        <rect x="10" y="12" width="16" height="4"  rx="2"   fill="${inner}" opacity="0.95"/>
-        <rect x="11" y="16" width="14" height="11" rx="2"   fill="${inner}" opacity="0.95"/>
-        <line x1="15.5" y1="18" x2="15.5" y2="25" stroke="${highlight ? '#e65100' : color}" stroke-width="1.2" opacity="0.7"/>
-        <line x1="18.5" y1="18" x2="18.5" y2="25" stroke="${highlight ? '#e65100' : color}" stroke-width="1.2" opacity="0.7"/>
-        <line x1="21.5" y1="18" x2="21.5" y2="25" stroke="${highlight ? '#e65100' : color}" stroke-width="1.2" opacity="0.7"/>
-      </svg>`;
-  }
-
-  function makeIcon(src, highlight = false) {
-    if (CUSTOM_ICON_URL) {
-      return L.icon({
-        iconUrl: CUSTOM_ICON_URL,
-        iconSize:      highlight ? [48, 48] : [36, 36],
-        iconAnchor:    highlight ? [24, 48] : [18, 36],
-        tooltipAnchor: [0, highlight ? -48 : -36],
-      });
-    }
-    return L.divIcon({
-      html: makePinSVG(src.color, src.pinInner, highlight),
-      className: '',
-      iconSize: [36, 46],
-      iconAnchor: [18, 46],
-      tooltipAnchor: [0, -46],
-    });
-  }
-
-  const myDotIcon = L.divIcon({
-    html: '<div class="my-dot"></div>',
-    className: '',
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
-  });
-
-  // ── 필드 감지 (소스별) ──────────────────────────────
-  function detectFields(src, sample) {
-    const keys = Object.keys(sample);
-    src.latField  = LAT_FIELDS.find(f => keys.includes(f))  || null;
-    src.lonField  = LON_FIELDS.find(f => keys.includes(f))  || null;
-    src.addrField = ADDR_FIELDS.find(f => keys.includes(f)) || null;
-
-    // 이름 매칭 실패 시 서울 좌표 범위(위도 37.4~37.7, 경도 126.7~127.3)로 자동 탐지
-    if (!src.latField || !src.lonField) {
-      for (const k of keys) {
-        const v = parseFloat(sample[k]);
-        if (isNaN(v)) continue;
-        if (v > 37.4 && v < 37.7)   src.latField = src.latField || k;
-        if (v > 126.7 && v < 127.3) src.lonField = src.lonField || k;
-      }
-    }
-    console.log(`[${src.name}] 필드 감지:`, { lat: src.latField, lon: src.lonField, addr: src.addrField, 전체: keys });
-  }
+  let allData            = [];
+  let allMarkers         = [];
+  let markersInClusterer = false;
+  let clusterer          = null;
+  let dongOverlays       = [];
+  let myMarker           = null;
+  let userLatLng         = null;
+  let nearestItem        = null;
+  let listContext        = null;
+  let map                = null;
 
   // ── 거리 계산 ────────────────────────────────────────
   function distM(lat1, lon1, lat2, lon2) {
@@ -1087,78 +926,65 @@
             + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
-
-  function fmtDist(m) {
-    return m < 1000 ? `${Math.round(m)}m` : `${(m/1000).toFixed(1)}km`;
-  }
+  function fmtDist(m) { return m < 1000 ? `${Math.round(m)}m` : `${(m/1000).toFixed(1)}km`; }
 
   // ── 패널 자동 펼치기 ─────────────────────────────────
+  const panelToggleBtn = document.getElementById('panel-toggle');
   function expandPanel() {
     if (document.body.classList.contains('panel-collapsed')) {
       document.body.classList.remove('panel-collapsed');
       panelToggleBtn.textContent = '▶';
-      setTimeout(() => map.invalidateSize(), 360);
+      setTimeout(() => map && map.relayout(), 360);
     }
   }
 
-  // ── 리스트 화면 표시 ─────────────────────────────────
+  // ── 뷰 전환 ──────────────────────────────────────────
   function showList(items, title) {
     listContext = { items, title };
     document.getElementById('view-default').style.display = 'none';
     document.getElementById('view-detail').style.display  = 'none';
     document.getElementById('view-list').style.display    = 'block';
     document.getElementById('list-title').textContent = `${title} (${items.length}개)`;
-
     const container = document.getElementById('list-items');
     container.innerHTML = '';
     for (const item of items) {
-      const src  = item._src;
-      const addr = item[src.addrField] || '위치 정보 없음';
-      const div  = document.createElement('div');
+      const div = document.createElement('div');
       div.className = 'list-item';
       div.innerHTML = `
-        <div class="list-item-icon" style="color:${src.color}">🗑️</div>
+        <div class="list-item-icon" style="color:${item._src.color}">🗑️</div>
         <div>
-          <div class="list-item-addr">${addr}</div>
-          <div class="list-item-sub">${src.name}</div>
+          <div class="list-item-addr">${item._addr || '위치 정보 없음'}</div>
+          <div class="list-item-sub">${item._src.name}</div>
         </div>`;
       div.addEventListener('click', () => showDetail(item, true));
       container.appendChild(div);
     }
   }
-
   document.getElementById('list-back').addEventListener('click', showDefault);
 
-  // ── 상세 패널 열기 ────────────────────────────────────
   function showDetail(item, fromList = false) {
     if (!fromList) listContext = null;
     document.getElementById('view-default').style.display = 'none';
     document.getElementById('view-list').style.display    = 'none';
     document.getElementById('view-detail').style.display  = 'block';
 
-    const src  = item._src;
-    const addr = src.addrField ? (item[src.addrField] || '') : '';
-    document.getElementById('detail-title').textContent    = addr || '쓰레기통';
-    document.getElementById('detail-subtitle').textContent = src.name;
+    document.getElementById('detail-title').textContent    = item._addr || '쓰레기통';
+    document.getElementById('detail-subtitle').textContent = item._src.name;
 
-    // 거리
-    const lat = parseFloat(item[src.latField]);
-    const lon = parseFloat(item[src.lonField]);
+    const lat = item._lat, lon = item._lon;
     const distWrap = document.getElementById('detail-dist-wrap');
     if (userLatLng && !isNaN(lat) && !isNaN(lon)) {
-      const d = distM(userLatLng.lat, userLatLng.lng, lat, lon);
+      const d = distM(userLatLng.getLat(), userLatLng.getLng(), lat, lon);
       document.getElementById('detail-dist').textContent = `📍 내 위치에서 ${fmtDist(d)}`;
       distWrap.style.display = 'block';
     } else {
       distWrap.style.display = 'none';
     }
 
-    // 전체 필드 목록 (_src 내부 키 제외)
     const container = document.getElementById('detail-fields');
     container.innerHTML = '';
-    const SKIP = new Set([src.latField, src.lonField, '_src']);
     for (const [k, v] of Object.entries(item)) {
-      if (SKIP.has(k) || !String(v).trim()) continue;
+      if (k.startsWith('_') || k === 'geocode' || !String(v).trim()) continue;
       const row = document.createElement('div');
       row.className = 'detail-field';
       row.innerHTML = `<span class="field-key">${k}</span><span class="field-val">${v}</span>`;
@@ -1171,11 +997,9 @@
       container.appendChild(row);
     }
 
-    // 로드뷰
     const rwWrap = document.getElementById('detail-roadview-wrap');
-    const rwLink = document.getElementById('detail-roadview-link');
     if (!isNaN(lat) && !isNaN(lon)) {
-      rwLink.href = `https://map.kakao.com/link/roadview/${lat},${lon}`;
+      document.getElementById('detail-roadview-link').href = `https://map.kakao.com/link/roadview/${lat},${lon}`;
       rwWrap.style.display = 'block';
     } else {
       rwWrap.style.display = 'none';
@@ -1188,159 +1012,104 @@
     document.getElementById('view-detail').style.display  = 'none';
     document.getElementById('view-list').style.display    = 'none';
   }
-
   document.getElementById('detail-back').addEventListener('click', () => {
-    if (listContext) {
-      showList(listContext.items, listContext.title);
-    } else {
-      showDefault();
-    }
+    if (listContext) showList(listContext.items, listContext.title);
+    else showDefault();
   });
 
-  // ── 동 단위 집계 레이어 생성 ────────────────────────
-  function buildDongLayer() {
-    if (dongLayer) map.removeLayer(dongLayer);
-    dongLayer = L.layerGroup();
-
-    // 구별로 동 집계
+  // ── 동 집계 오버레이 ─────────────────────────────────
+  function buildDongOverlays() {
+    dongOverlays.forEach(o => o.setMap(null));
+    dongOverlays = [];
     for (const src of SOURCES) {
       const groups = {};
       for (const item of allData) {
         if (item._src !== src) continue;
-        const addr = src.addrField ? (item[src.addrField] || '') : '';
-        const match = addr.match(/([가-힣]+동)/);
-        const dong = match ? match[1] : null;
-        if (!dong) continue;
-
-        const lat = parseFloat(item[src.latField]);
-        const lon = parseFloat(item[src.lonField]);
-        if (isNaN(lat) || isNaN(lon)) continue;
-
+        const match = (item._addr || '').match(/([가-힣]+동)/);
+        if (!match) continue;
+        const dong = match[1];
+        if (isNaN(item._lat) || isNaN(item._lon)) continue;
         if (!groups[dong]) groups[dong] = { latSum: 0, lonSum: 0, count: 0 };
-        groups[dong].latSum += lat;
-        groups[dong].lonSum += lon;
+        groups[dong].latSum += item._lat;
+        groups[dong].lonSum += item._lon;
         groups[dong].count++;
       }
-
       for (const [dong, g] of Object.entries(groups)) {
-        const lat = g.latSum / g.count;
-        const lon = g.lonSum / g.count;
-
-        const icon = L.divIcon({
-          html: `<div class="dong-bubble" style="background:${src.dongBg};">
-            <div class="d-name">${dong}</div>
-            <div class="d-count">🗑️ ${g.count}개</div>
-          </div>`,
-          className: '',
-          iconSize: [1, 1],
-          iconAnchor: [0, 0],
+        const lat = g.latSum / g.count, lon = g.lonSum / g.count;
+        const content = document.createElement('div');
+        content.style.cssText = 'display:inline-block;line-height:0;';
+        content.innerHTML = `<div class="dong-bubble" style="background:${src.dongBg};">
+          <div class="d-name">${dong}</div>
+          <div class="d-count">🗑️ ${g.count}개</div>
+        </div>`;
+        content.firstChild.addEventListener('click', () => {
+          map.setCenter(new kakao.maps.LatLng(lat, lon));
+          map.setLevel(DONG_THRESHOLD - 1, { animate: true });
         });
-
-        const m = L.marker([lat, lon], { icon });
-        m.on('click', () => {
-          map.flyTo([lat, lon], DONG_THRESHOLD, { duration: 0.8 });
-        });
-        dongLayer.addLayer(m);
+        dongOverlays.push(new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(lat, lon),
+          content,
+          xAnchor: 0.5,
+          yAnchor: 0.5,
+          zIndex: 5,
+        }));
       }
     }
   }
 
   // ── 줌 기반 레이어 전환 ───────────────────────────────
   function updateLayers() {
-    const zoom = map.getZoom();
-    if (zoom < DONG_THRESHOLD) {
-      if (dongLayer      && !map.hasLayer(dongLayer))      map.addLayer(dongLayer);
-      if (markerCluster  &&  map.hasLayer(markerCluster))  map.removeLayer(markerCluster);
-    } else {
-      if (dongLayer      &&  map.hasLayer(dongLayer))      map.removeLayer(dongLayer);
-      if (markerCluster  && !map.hasLayer(markerCluster))  map.addLayer(markerCluster);
+    if (!map) return;
+    const showDong = map.getLevel() >= DONG_THRESHOLD;
+    dongOverlays.forEach(o => o.setMap(showDong ? map : null));
+    if (clusterer && allMarkers.length > 0) {
+      if (showDong && markersInClusterer) {
+        clusterer.clear();
+        markersInClusterer = false;
+      } else if (!showDong && !markersInClusterer) {
+        clusterer.addMarkers(allMarkers);
+        markersInClusterer = true;
+      }
     }
   }
 
-  map.on('zoomend', updateLayers);
-
   // ── 개별 핀 마커 렌더링 ──────────────────────────────
   function renderMarkers(highlightItem = null) {
-    if (markerCluster) map.removeLayer(markerCluster);
-    nearestMarkerRef = null;
-
-    markerCluster = L.markerClusterGroup({
-      maxClusterRadius: 50,
-      showCoverageOnHover: false,
-      spiderfyOnMaxZoom: false,
-      zoomToBoundsOnClick: false,
-      iconCreateFunction(cluster) {
-        const n = cluster.getChildCount();
-        const sz = n < 10 ? 36 : n < 100 ? 42 : 48;
-        return L.divIcon({
-          html: `<div class="custom-cluster" style="width:${sz}px;height:${sz}px;">${n}</div>`,
-          className: '',
-          iconSize: [sz, sz],
-          iconAnchor: [sz/2, sz/2],
-        });
-      },
-    });
-
+    if (clusterer) { clusterer.clear(); markersInClusterer = false; }
+    allMarkers = [];
     for (const item of allData) {
-      const src = item._src;
-      const lat = parseFloat(item[src.latField]);
-      const lon = parseFloat(item[src.lonField]);
+      const lat = item._lat, lon = item._lon;
       if (isNaN(lat) || isNaN(lon)) continue;
-
-      const isHighlight = highlightItem && item === highlightItem;
-      const addr = src.addrField ? (item[src.addrField] || '주소 없음') : '위치 정보 없음';
-
-      const marker = L.marker([lat, lon], {
-        icon: makeIcon(src, isHighlight),
-        zIndexOffset: isHighlight ? 1000 : 0,
+      const isHL  = highlightItem && item === highlightItem;
+      const size  = isHL ? 48 : 36;
+      const marker = new kakao.maps.Marker({
+        position: new kakao.maps.LatLng(lat, lon),
+        image: new kakao.maps.MarkerImage(
+          CUSTOM_ICON_URL,
+          new kakao.maps.Size(size, size),
+          { offset: new kakao.maps.Point(size / 2, size) }
+        ),
+        zIndex: isHL ? 10 : 1,
+        title:  item._addr || '',
       });
-
-      marker.bindTooltip(`[${src.name}] ${addr}`, {
-        permanent: false,
-        direction: 'top',
-        offset: [0, -44],
-        opacity: 1,
-        className: 'trash-tooltip',
-      });
-
-      marker.on('click', () => {
+      marker._trashItem = item;
+      kakao.maps.event.addListener(marker, 'click', () => {
         expandPanel();
         showDetail(item);
-        map.panTo([lat, lon], { animate: true, duration: 0.5 });
+        map.panTo(new kakao.maps.LatLng(lat, lon));
       });
-
-      marker._trashItem = item;
-      markerCluster.addLayer(marker);
-      if (isHighlight) nearestMarkerRef = marker;
+      allMarkers.push(marker);
     }
-
-    // 클러스터 클릭 → 리스트 표시
-    markerCluster.on('clusterclick', (e) => {
-      const markers = e.layer.getAllChildMarkers();
-      const items   = markers.map(m => m._trashItem).filter(Boolean);
-      if (items.length > 0) {
-        if (items.length <= 20) {
-          expandPanel();
-          showList(items, '이 위치의 쓰레기통');
-        } else {
-          e.layer.zoomToBounds({ padding: [20, 20] });
-        }
-      }
-    });
-
-    // 레이어 추가는 updateLayers()가 줌 상태에 따라 결정
     updateLayers();
   }
 
   // ── 가장 가까운 쓰레기통 ──────────────────────────────
   function findNearest(latlng) {
+    const uLat = latlng.getLat(), uLon = latlng.getLng();
     let minDist = Infinity, best = null;
     for (const item of allData) {
-      const src = item._src;
-      const lat = parseFloat(item[src.latField]);
-      const lon = parseFloat(item[src.lonField]);
-      if (isNaN(lat) || isNaN(lon)) continue;
-      const d = distM(latlng.lat, latlng.lng, lat, lon);
+      if (isNaN(item._lat) || isNaN(item._lon)) continue;
+      const d = distM(uLat, uLon, item._lat, item._lon);
       if (d < minDist) { minDist = d; best = item; }
     }
     return { item: best, dist: minDist };
@@ -1349,95 +1118,37 @@
   // ── 내 위치 ──────────────────────────────────────────
   function onLocate(latlng) {
     userLatLng = latlng;
-    if (myMarker) map.removeLayer(myMarker);
-    myMarker = L.marker(latlng, { icon: myDotIcon, zIndexOffset: 2000 }).addTo(map);
-
+    if (myMarker) myMarker.setMap(null);
+    const dot = document.createElement('div');
+    dot.className = 'my-dot';
+    myMarker = new kakao.maps.CustomOverlay({ position: latlng, content: dot, yAnchor: 0.5, zIndex: 10 });
+    myMarker.setMap(map);
     if (allData.length === 0) return;
-
     const { item, dist } = findNearest(latlng);
     if (!item) return;
-
     nearestItem = item;
     renderMarkers(item);
-
-    const src  = item._src;
-    const addr = src.addrField ? (item[src.addrField] || '주소 없음') : '위치 정보 없음';
-    document.getElementById('nc-addr').textContent = `[${src.name}] ${addr}`;
+    document.getElementById('nc-addr').textContent = `[${item._src.name}] ${item._addr || '주소 없음'}`;
     document.getElementById('nc-dist').textContent = `내 위치에서 ${fmtDist(dist)}`;
     document.getElementById('stat-nearest').textContent = fmtDist(dist);
     document.getElementById('nearest-card').style.display = 'block';
-
     document.getElementById('nc-go').onclick = () => {
-      const lat = parseFloat(item[src.latField]);
-      const lon = parseFloat(item[src.lonField]);
-      map.flyTo([lat, lon], 18, { duration: 1.2 });
+      map.setCenter(new kakao.maps.LatLng(item._lat, item._lon));
+      map.setLevel(2, { animate: true });
       showDetail(item);
     };
   }
 
-
-  // ── 데이터 로드 (사전 지오코딩된 data.json) ──────────
-  async function loadData() {
-    document.getElementById('loading').style.display = 'flex';
-    try {
-      const res  = await fetch('./data.json');
-      const rows = await res.json();  // [{ district, label, road, lat, lon, detail }, ...]
-
-      // 각 행에 렌더링에 필요한 _src, _lat, _lon, _addr 주입
-      const srcByName = Object.fromEntries(SOURCES.map(s => [s.name, s]));
-
-      allData = rows.map(row => {
-        const src = srcByName[row.district] || SOURCES[0];
-        return Object.assign({}, row.detail, {
-          _src:  src,
-          _lat:  row.lat,
-          _lon:  row.lon,
-          _addr: row.label,
-          _road: row.road,
-        });
-      });
-
-      // src 필드 참조를 _lat/_lon/_addr 으로 통일
-      for (const src of SOURCES) {
-        src.latField  = '_lat';
-        src.lonField  = '_lon';
-        src.addrField = '_addr';
-      }
-
-      // 구별 카운트
-      for (const src of SOURCES) {
-        const cnt = allData.filter(d => d._src === src).length;
-        const el  = document.getElementById(src.statId);
-        if (el) el.textContent = cnt.toLocaleString() + '개';
-      }
-
-      document.getElementById('loading').style.display = 'none';
-
-      try { buildDongLayer(); } catch(e) { console.error('buildDongLayer 오류:', e); }
-      try { renderMarkers();  } catch(e) { console.error('renderMarkers 오류:', e); }
-      updateDashboard();
-      showLocationModal();
-
-    } catch (err) {
-      console.error(err);
-      document.getElementById('loading').innerHTML =
-        `<p style="color:#e53935;font-size:14px;">데이터 로드 실패: ${err.message}</p>`;
-      document.getElementById('loading').style.display = 'flex';
-    }
-  }
-
-  // ── 위치 동의 모달 ──────────────────────────────────
+  // ── 위치 요청 ────────────────────────────────────────
   function requestLocation() {
-    if (!navigator.geolocation) {
-      alert('이 브라우저는 위치 기능을 지원하지 않습니다.');
-      return;
-    }
+    if (!navigator.geolocation) { alert('이 브라우저는 위치 기능을 지원하지 않습니다.'); return; }
     document.getElementById('locate-btn').textContent = '위치 확인 중...';
     navigator.geolocation.getCurrentPosition(
       pos => {
         document.getElementById('locate-btn').innerHTML = '📍 가까운 쓰레기통 찾기';
-        const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
-        map.flyTo(latlng, 16, { duration: 1.5 });
+        const latlng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+        map.setCenter(latlng);
+        map.setLevel(3, { animate: true });
         onLocate(latlng);
       },
       () => {
@@ -1447,54 +1158,114 @@
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }
-
-  function showLocationModal() {
-    document.getElementById('location-modal').style.display = 'flex';
-  }
-
   document.getElementById('lm-allow').addEventListener('click', () => {
     document.getElementById('location-modal').style.display = 'none';
     requestLocation();
   });
-
   document.getElementById('lm-deny').addEventListener('click', () => {
     document.getElementById('location-modal').style.display = 'none';
   });
-
-  // 패널의 내 위치 버튼은 모달 없이 바로 요청
   document.getElementById('locate-btn').addEventListener('click', requestLocation);
 
-  // ── 지도 대시보드 업데이트 ──────────────────────────
+  // ── 대시보드 업데이트 ────────────────────────────────
   function updateDashboard() {
-    if (allData.length === 0) return;
+    if (!map || allData.length === 0) return;
     const bounds = map.getBounds();
     let visGangnam = 0, visSongpa = 0;
     for (const d of allData) {
-      const lat = parseFloat(d[d._src.latField]);
-      const lon = parseFloat(d[d._src.lonField]);
-      if (isNaN(lat) || isNaN(lon)) continue;
-      if (!bounds.contains([lat, lon])) continue;
-      if (d._src.name === '강남구') visGangnam++;
-      else visSongpa++;
+      if (isNaN(d._lat) || isNaN(d._lon)) continue;
+      if (!bounds.contain(new kakao.maps.LatLng(d._lat, d._lon))) continue;
+      if (d._src.name === '강남구') visGangnam++; else visSongpa++;
     }
-    const visTotal = visGangnam + visSongpa;
     document.getElementById('dash-total').textContent   = allData.length.toLocaleString();
-    document.getElementById('dash-visible').textContent = visTotal.toLocaleString();
+    document.getElementById('dash-visible').textContent = (visGangnam + visSongpa).toLocaleString();
     document.getElementById('dash-gangnam').textContent = visGangnam.toLocaleString();
     document.getElementById('dash-songpa').textContent  = visSongpa.toLocaleString();
   }
 
-  map.on('moveend zoomend', updateDashboard);
-
   // ── 패널 토글 ────────────────────────────────────────
-  const panelToggleBtn = document.getElementById('panel-toggle');
   panelToggleBtn.addEventListener('click', () => {
     const collapsed = document.body.classList.toggle('panel-collapsed');
     panelToggleBtn.textContent = collapsed ? '◀' : '▶';
-    setTimeout(() => map.invalidateSize(), 360);
+    setTimeout(() => map && map.relayout(), 360);
   });
 
-  loadData();
+  // ── 데이터 로드 ──────────────────────────────────────
+  async function loadData() {
+    document.getElementById('loading').style.display = 'flex';
+    try {
+      const rows = await fetch('./data.json').then(r => r.json());
+      const srcByName = Object.fromEntries(SOURCES.map(s => [s.name, s]));
+      allData = rows.map(row => Object.assign({}, row.detail || {}, {
+        _src:  srcByName[row.district] || SOURCES[0],
+        _lat:  row.lat,
+        _lon:  row.lon,
+        _addr: row.label,
+        _road: row.road,
+        geocode: row.geocode,
+      }));
+      for (const src of SOURCES) {
+        const el = document.getElementById(src.statId);
+        if (el) el.textContent = allData.filter(d => d._src === src).length.toLocaleString() + '개';
+      }
+      document.getElementById('loading').style.display = 'none';
+      buildDongOverlays();
+      renderMarkers();
+      updateDashboard();
+      document.getElementById('location-modal').style.display = 'flex';
+    } catch (err) {
+      console.error(err);
+      document.getElementById('loading').innerHTML =
+        `<p style="color:#e53935;font-size:14px;">데이터 로드 실패: ${err.message}</p>`;
+      document.getElementById('loading').style.display = 'flex';
+    }
+  }
+
+  // ── Kakao Maps 초기화 ────────────────────────────────
+  kakao.maps.load(function() {
+    map = new kakao.maps.Map(document.getElementById('map'), {
+      center: new kakao.maps.LatLng(37.5050, 127.0900),
+      level: 7,
+    });
+
+    map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.BOTTOMLEFT);
+
+    clusterer = new kakao.maps.MarkerClusterer({
+      map,
+      averageCenter: true,
+      minLevel: 3,
+      disableClickZoom: true,
+      styles: [
+        { width:'36px', height:'36px', background:'#2e7d52', borderRadius:'50%',
+          border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'12px',
+          lineHeight:'30px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
+        { width:'42px', height:'42px', background:'#2e7d52', borderRadius:'50%',
+          border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'13px',
+          lineHeight:'36px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
+        { width:'48px', height:'48px', background:'#2e7d52', borderRadius:'50%',
+          border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'14px',
+          lineHeight:'42px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
+        { width:'48px', height:'48px', background:'#1a5c38', borderRadius:'50%',
+          border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'14px',
+          lineHeight:'42px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
+      ],
+    });
+
+    kakao.maps.event.addListener(clusterer, 'clusterclick', function(cluster) {
+      const items = cluster.getMarkers().map(m => m._trashItem).filter(Boolean);
+      if (items.length <= 20) {
+        expandPanel();
+        showList(items, '이 위치의 쓰레기통');
+      } else {
+        map.setLevel(map.getLevel() - 1, { animate: true });
+      }
+    });
+
+    kakao.maps.event.addListener(map, 'zoom_changed', () => { updateLayers(); updateDashboard(); });
+    kakao.maps.event.addListener(map, 'idle', updateDashboard);
+
+    loadData();
+  });
 </script>
 </body>
 </html>
