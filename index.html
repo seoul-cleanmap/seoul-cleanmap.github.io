@@ -1193,6 +1193,7 @@
   // ── 초기화 조율 (데이터 + 지도 모두 준비되면 렌더) ──
   let _dataReady = false;
   let _mapReady  = false;
+  let _sdkFailed = false;
 
   function _tryRender() {
     if (!_dataReady || !_mapReady) return;
@@ -1221,7 +1222,7 @@
         if (el) el.textContent = allData.filter(d => d._src === src).length.toLocaleString() + '개';
       }
       _dataReady = true;
-      document.querySelector('#loading p').textContent = '지도를 불러오는 중...';
+      if (!_sdkFailed) document.querySelector('#loading p').textContent = '지도를 불러오는 중...';
       _tryRender();
     } catch (err) {
       console.error(err);
@@ -1231,6 +1232,14 @@
   })();
 
   // ── Kakao Maps 초기화 ────────────────────────────────
+  if (typeof kakao === 'undefined') {
+    _sdkFailed = true;
+    document.getElementById('loading').innerHTML =
+      `<p style="color:#e53935;font-size:14px;text-align:center;padding:20px;">
+        카카오 지도 SDK 로드 실패<br>
+        <span style="font-size:11px;color:#888;">JavaScript 앱키 또는 도메인 등록을 확인해주세요</span>
+      </p>`;
+  } else {
   kakao.maps.load(function() {
     map = new kakao.maps.Map(document.getElementById('map'), {
       center: new kakao.maps.LatLng(37.5050, 127.0900),
@@ -1276,6 +1285,7 @@
     _mapReady = true;
     _tryRender();
   });
+  } // end else (kakao defined)
 </script>
 </body>
 </html>
