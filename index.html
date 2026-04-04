@@ -1376,6 +1376,7 @@
     }
     const ql = q.toLowerCase();
     const results = allData.filter(d =>
+      (d._id    || '').includes(q.replace(/^no\.?/i, '').padStart(4, '0')) ||
       (d._addr  || '').toLowerCase().includes(ql) ||
       (d._road  || '').toLowerCase().includes(ql) ||
       (d._src && d._src.name || '').toLowerCase().includes(ql)
