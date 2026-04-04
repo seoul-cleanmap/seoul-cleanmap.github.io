@@ -1142,6 +1142,9 @@
     markerCluster = L.markerClusterGroup({
       maxClusterRadius: 50,
       spiderfyOnMaxZoom: false,
+      chunkedLoading: true,
+      chunkInterval: 100,
+      chunkDelay: 50,
       iconCreateFunction(cluster) {
         const count = cluster.getChildCount();
         const size = count < 10 ? 36 : count < 50 ? 42 : 48;
@@ -1268,8 +1271,12 @@
   });
 
   // ── 지도 이벤트 ──────────────────────────────────────
-  map.on('zoomend', () => { updateLayers(); updateDashboard(); });
-  map.on('moveend', updateDashboard);
+  function debounce(fn, ms) {
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  }
+  const debouncedDashboard = debounce(updateDashboard, 150);
+  map.on('zoomend', () => { updateLayers(); debouncedDashboard(); });
+  map.on('moveend', debouncedDashboard);
 
   // ── 데이터 로드 ──────────────────────────────────────
   async function loadData() {
