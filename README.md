@@ -1,7 +1,8 @@
-# 서울 쓰레기통 지도
+# 서울 클린맵 (Seoul Clean Map)
 
-강남구·송파구 공공 쓰레기통 위치를 지도로 표시하는 정적 웹앱.  
-GitHub Pages 호스팅: https://goatmonkey90.github.io/seoul_trashcanmap/
+서울시 25개 자치구 공공 쓰레기통 위치를 지도로 표시하는 정적 웹앱.
+
+**배포 주소**: https://seoul-cleanmap.github.io
 
 ---
 
@@ -9,7 +10,7 @@ GitHub Pages 호스팅: https://goatmonkey90.github.io/seoul_trashcanmap/
 
 - **Leaflet 1.9.4** — 지도 렌더링
 - **Leaflet.markercluster 1.5.3** — 마커 클러스터링
-- **CartoDB Positron** 타일 — 배경 지도 (무료)
+- **Vworld WMTS** — 배경 지도 (국토지리정보원)
 - **data.json** — 사전 지오코딩된 좌표 데이터 (정적 파일)
 - 외부 API 없음 (순수 정적 사이트)
 
@@ -19,14 +20,14 @@ GitHub Pages 호스팅: https://goatmonkey90.github.io/seoul_trashcanmap/
 
 ```
 seoul_trashcanmap/
-├── index.html          # 단일 파일 앱 (HTML/CSS/JS 일체형)
-├── data.json           # 사전 지오코딩된 쓰레기통 데이터 (1,002건)
-├── icon.png            # 커스텀 쓰레기통 아이콘 (초록색 PNG)
-├── README.md
-└── .claude-scripts/    # 개발 보조 스크립트 (커밋 제외)
-    ├── geocode_data.js         # 강남구+송파구 지오코딩 (최초 실행용)
-    ├── geocode_songpa.js       # 송파구 전용 지오코딩
-    └── geocode_songpa_retry.js # 송파구 실패 도로 재시도
+├── index.html              # 단일 파일 앱 (HTML/CSS/JS 일체형)
+├── data.json               # 25개구 쓰레기통 데이터 (2,917건)
+├── icon.png                # 커스텀 쓰레기통 아이콘
+├── build_data.py           # data.json 빌드 스크립트
+├── verify_geocode.py       # 지오코딩 검수 도구 (Kakao 교차검증)
+├── improve_geocode.py      # 지오코딩 정확도 개선 도구 (Kakao 재지오코딩)
+├── fetch_api_data.py       # 공공데이터포털 API 수집 (강남·송파, 승인 대기)
+└── .claude-scripts/        # 구버전 스크립트 (참고용)
 ```
 
 ---
@@ -36,92 +37,90 @@ seoul_trashcanmap/
 ```json
 [
   {
-    "district": "강남구",
-    "label": "청담톡스앤필의원",
-    "road": "압구정로",
-    "lat": 37.522...,
-    "lon": 127.019...,
-    "detail": { ...원본 API 필드... }
-  },
-  ...
+    "district": "종로구",
+    "label": "경복궁역 4번출구",
+    "road": "사직로 125",
+    "detail": "경복궁역 4번출구",
+    "place_type": "지하철역 입구",
+    "kind": "일반쓰레기 + 재활용쓰레기",
+    "lat": 37.576130,
+    "lon": 126.972909,
+    "geocode": "vworld"
+  }
 ]
 ```
 
-- **강남구**: 864건 (공공데이터포털 API 15038054)
-- **송파구**: 138건 (공공데이터포털 API 15096706)
-- 좌표 없는 API 데이터를 Nominatim(OpenStreetMap)으로 도로명 기준 지오코딩
-- 같은 도로 위 쓰레기통은 ±0.0004° 랜덤 오프셋으로 분산
+### geocode 값 의미
+
+| 값 | 설명 |
+|----|------|
+| `csv_official` | 전국휴지통표준데이터 CSV의 공식 GPS 좌표 |
+| `vworld` | Vworld API 지오코딩 (도로명주소 또는 POI 검색) |
+| `kakao` | Kakao Local Search 재지오코딩 (improve_geocode.py 적용 시) |
 
 ---
 
 ## 주요 기능
 
 ### 지도
-- **줌 레벨 < 14**: 동 단위 버블 (구별 색상 구분: 강남구=초록, 송파구=파랑)
+- **줌 레벨 < 14**: 구 단위 버블 (자치구별 색상 구분)
 - **줌 레벨 ≥ 14**: 개별 마커 클러스터
 - **클러스터 클릭**: 20개 이하면 리스트 뷰, 20개 초과면 줌인
-- **마커 클릭**: 상세 정보 패널 자동 펼치기 + 상세 뷰 표시
+- **마커 클릭**: 상세 정보 패널 표시
 
 ### 사이드 패널
-- **기본 뷰**: 구별 통계, 내 위치 찾기 버튼, 데이터 출처
-- **리스트 뷰**: 클러스터 내 쓰레기통 목록 (뒤로가기 지원)
-- **상세 뷰**: 전체 필드 표시, 내 위치까지 거리, 카카오 로드뷰 링크
-- **패널 토글**: ▶/◀ 버튼으로 접기/펼치기 (마커 클릭 시 자동 펼침)
-
-### 대시보드 (지도 좌하단)
-- 전체 쓰레기통 수 / 현재 화면 내 수 / 구별 수 실시간 표시
-
-### 내 위치
-- 접속 시 위치 동의 모달 (매 방문마다, 저장 없음)
-- 가장 가까운 쓰레기통 하이라이트 + 거리 표시
-- 최근접 쓰레기통 "지도에서 보기" 버튼
+- **기본 뷰**: 전체·자치구 통계, 내 위치 찾기
+- **리스트 뷰**: 클러스터 내 목록
+- **상세 뷰**: 도로명·장소유형·종류·좌표 표시, 카카오 로드뷰 링크, 내 위치까지 거리
+- **다크모드** 지원
 
 ---
 
 ## 데이터 재생성 방법
 
-Node.js 18+ 필요.
+Python 3.8+ 및 `openpyxl` 필요.
 
 ```bash
-# 강남구 + 송파구 전체 재지오코딩 (약 10분, Nominatim 딜레이 포함)
-node .claude-scripts/geocode_data.js
-
-# 송파구만 재시도
-node .claude-scripts/geocode_songpa.js
-
-# 실패한 도로명만 재시도
-node .claude-scripts/geocode_songpa_retry.js
+pip install openpyxl
+python build_data.py
 ```
 
-API 키: 공공데이터포털 서비스키 (`.claude-scripts/geocode_data.js` 내 `SERVICE_KEY`)
+1. `서울특별시 가로쓰레기통 설치정보_202312.xlsx` 에서 중복 합치기 (5,381 → 3,675건)
+2. `전국휴지통표준데이터.csv` 에서 공식 GPS 좌표 매칭 (357건)
+3. 나머지는 Vworld API 지오코딩 (~5분 소요)
+4. 좌표 없는 항목 제거 → `data.json` 출력
 
 ---
 
-## 지오코딩 현황
+## 지오코딩 검수 및 개선
 
-| 구 | 전체 | 성공 | 비고 |
-|----|------|------|------|
-| 강남구 | 976건 | 864건 | 112건 실패 (미등록 도로명) |
-| 송파구 | 139건 | 138건 | 1건 실패 (`삼학사로 1길 22` 미인식) |
+```bash
+# 1) 현재 좌표 검수 (Kakao 교차검증 → verify_result.csv 출력)
+python verify_geocode.py
 
-Nominatim 요청 제한: 1~3초 딜레이 필수. 연속 요청 시 일시 차단(HTML 반환) 가능.
+# 2) 정확도 개선 (버스정류장·지하철역 우선, vworld 항목 Kakao 재지오코딩)
+python improve_geocode.py
+```
+
+- `verify_result.csv`: BAD(500m↑) / SUSPECT(200m↑) / NOT_FOUND 항목 목록
+- `improve_geocode.py` 실행 전 `data_backup_YYYYMMDD.json` 자동 백업
 
 ---
 
-## 향후 작업 후보
+## 데이터 현황 (2023.12 기준)
 
-- [ ] 지도 배경을 네이버 지도로 교체 (한국 지도 품질 향상, 무료 300만건/월)
-- [ ] 구 추가 (서초구, 강동구 등)
-- [ ] 필터 기능 (구별 on/off)
-- [ ] 모바일 레이아웃 개선
-- [ ] 카카오 로드뷰 iframe 미리보기 (API 키 필요)
-- [ ] 데이터 자동 갱신 (GitHub Actions + cron)
-- [ ] 강남구 실패 112건 재시도 (Vworld 주소 API 활용 가능)
+| 항목 | 값 |
+|------|----|
+| 전체 | 2,917건 |
+| 자치구 | 25개구 |
+| 공식 좌표 (csv_official) | 357건 |
+| Vworld 지오코딩 (vworld) | 2,560건 |
+| 강남구·송파구 공식 좌표 | 공공데이터포털 API 승인 대기 중 |
 
 ---
 
 ## 개발 환경
 
 - Windows 11
-- Node.js (지오코딩 스크립트 실행용)
-- 특별한 빌드 과정 없음 — index.html 직접 수정 후 커밋/푸시
+- Python 3.x (데이터 빌드 스크립트)
+- 빌드 과정 없음 — `index.html` 수정 후 커밋/푸시
