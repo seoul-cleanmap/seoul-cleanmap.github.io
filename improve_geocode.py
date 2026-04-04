@@ -227,7 +227,7 @@ def main():
             f"{item['district']} | {label[:35]:<35} | {dist:>6.0f}m | {best.get('place_name','')}"
         )
         if dist >= 300:
-            print(f"  ✅ {item['district']} {label[:30]} | {dist:.0f}m → {best.get('place_name','')}")
+            print(f"  [OK] {item['district']} {label[:30]} | {dist:.0f}m -> {best.get('place_name','')}")
 
         if (seq + 1) % 200 == 0:
             print(f"  {seq+1}/{len(targets)} | 교체:{updated} 스킵:{skipped} 오류:{error}", flush=True)
