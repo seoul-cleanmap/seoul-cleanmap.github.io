@@ -740,15 +740,6 @@
     <span class="dash-label">현재 화면</span>
   </div>
   <div class="dash-sep">|</div>
-  <div class="dash-item">
-    <span class="dash-num" id="dash-gangnam" style="color:#2e7d52">-</span>
-    <span class="dash-label">강남구</span>
-  </div>
-  <div class="dash-sep">|</div>
-  <div class="dash-item">
-    <span class="dash-num" id="dash-songpa" style="color:#1565C0">-</span>
-    <span class="dash-label">송파구</span>
-  </div>
   <div class="dash-sep">|</div>
   <div class="theme-ctrl">
     <button class="theme-btn" data-theme="light" title="라이트 모드">☀️</button>
@@ -768,17 +759,17 @@
       <div class="panel-logo-icon">🗑️</div>
       <div>
         <h1>서울 클린맵</h1>
-        <span>강남구 · 송파구</span>
+        <span>서울시 공공 쓰레기통</span>
       </div>
     </div>
     <div class="stat-row">
       <div class="stat-badge" style="border-left: 3px solid #2e7d52;">
-        <span class="num" id="stat-gangnam">-</span>
-        <div class="label">강남구</div>
+        <span class="num" id="stat-total-count">-</span>
+        <div class="label">전체</div>
       </div>
       <div class="stat-badge" style="border-left: 3px solid #1565C0;">
-        <span class="num" id="stat-songpa">-</span>
-        <div class="label">송파구</div>
+        <span class="num" id="stat-district-count">-</span>
+        <div class="label">자치구</div>
       </div>
       <div class="stat-badge">
         <span class="num" id="stat-nearest">-</span>
@@ -793,7 +784,7 @@
     <div id="view-default">
       <div class="section-title">안내</div>
       <div class="info-card">
-        <strong style="color:#2e7d52;">강남구</strong>와 <strong style="color:#1565C0;">송파구</strong>의
+        서울시 <strong id="info-districts">6개 자치구</strong>의
         공공 쓰레기통 위치를 한눈에 확인하세요.<br><br>
         핀을 클릭하면 <strong>상세 정보</strong>를 볼 수 있고,<br>
         줌아웃하면 <strong>동 단위 현황</strong>이 표시됩니다.<br><br>
@@ -811,7 +802,7 @@
 
       <div class="section-title" style="margin-top:20px">데이터 출처</div>
       <div class="info-card" style="font-size:12px; color:#666;">
-        강남구청 공공데이터 · 송파구청 공공데이터<br>
+        전국휴지통표준데이터<br>
         (공공데이터포털 제공)
       </div>
     </div>
@@ -833,7 +824,7 @@
         <div class="detail-icon">🗑️</div>
         <div>
           <div class="detail-title" id="detail-title">쓰레기통</div>
-          <div class="detail-subtitle" id="detail-subtitle">강남구</div>
+          <div class="detail-subtitle" id="detail-subtitle"></div>
         </div>
       </div>
 
@@ -859,7 +850,7 @@
       <img src="./emberandblade_banner.jpg" alt="Ember and Blade - Steam" />
       <span class="dash-banner-label">AD</span>
     </a>
-    <p class="panel-about">강남구·송파구 공공 쓰레기통 위치를 한눈에 확인하는 지도 서비스입니다.</p>
+    <p class="panel-about">서울시 공공 쓰레기통 위치를 한눈에 확인하는 지도 서비스입니다.</p>
   </div>
 
 </div>
@@ -892,8 +883,31 @@
 <script>
   // ── 설정 ─────────────────────────────────────────────
   const SOURCES = [
-    { name: '강남구', statId: 'stat-gangnam', color: '#2e7d52', pinInner: '#43a86d', dongBg: 'rgba(30,90,58,0.88)' },
-    { name: '송파구', statId: 'stat-songpa',  color: '#1565C0', pinInner: '#1976D2', dongBg: 'rgba(21,60,130,0.88)' },
+    { name: '강남구', color: '#2e7d52', dongBg: 'rgba(30,90,58,0.88)' },
+    { name: '강동구', color: '#1565C0', dongBg: 'rgba(21,60,130,0.88)' },
+    { name: '강북구', color: '#E65100', dongBg: 'rgba(180,60,10,0.88)' },
+    { name: '강서구', color: '#6A1B9A', dongBg: 'rgba(90,20,130,0.88)' },
+    { name: '관악구', color: '#00838F', dongBg: 'rgba(0,100,120,0.88)' },
+    { name: '광진구', color: '#C62828', dongBg: 'rgba(160,30,30,0.88)' },
+    { name: '구로구', color: '#AD1457', dongBg: 'rgba(140,16,70,0.88)' },
+    { name: '금천구', color: '#4527A0', dongBg: 'rgba(56,30,130,0.88)' },
+    { name: '노원구', color: '#0277BD', dongBg: 'rgba(2,96,152,0.88)' },
+    { name: '도봉구', color: '#558B2F', dongBg: 'rgba(68,112,38,0.88)' },
+    { name: '동대문구', color: '#EF6C00', dongBg: 'rgba(192,88,0,0.88)' },
+    { name: '동작구', color: '#00695C', dongBg: 'rgba(0,84,74,0.88)' },
+    { name: '마포구', color: '#283593', dongBg: 'rgba(32,44,118,0.88)' },
+    { name: '서대문구', color: '#9E9D24', dongBg: 'rgba(128,126,29,0.88)' },
+    { name: '서초구', color: '#5D4037', dongBg: 'rgba(74,52,44,0.88)' },
+    { name: '성동구', color: '#37474F', dongBg: 'rgba(44,56,64,0.88)' },
+    { name: '성북구', color: '#D84315', dongBg: 'rgba(174,54,17,0.88)' },
+    { name: '송파구', color: '#1565C0', dongBg: 'rgba(21,80,160,0.88)' },
+    { name: '양천구', color: '#7B1FA2', dongBg: 'rgba(100,26,130,0.88)' },
+    { name: '영등포구', color: '#00796B', dongBg: 'rgba(0,98,86,0.88)' },
+    { name: '용산구', color: '#BF360C', dongBg: 'rgba(154,44,10,0.88)' },
+    { name: '은평구', color: '#33691E', dongBg: 'rgba(41,84,24,0.88)' },
+    { name: '종로구', color: '#4E342E', dongBg: 'rgba(62,42,36,0.88)' },
+    { name: '중구', color: '#1A237E', dongBg: 'rgba(21,28,102,0.88)' },
+    { name: '중랑구', color: '#880E4F', dongBg: 'rgba(110,11,64,0.88)' },
   ];
 
   const CUSTOM_ICON_URL = './icon.png';
@@ -938,7 +952,7 @@
   };
 
   // ── 지도 초기화 ──────────────────────────────────────
-  const map = L.map('map', { center: [37.5050, 127.0900], zoom: 14, zoomControl: false });
+  const map = L.map('map', { center: [37.5550, 126.9800], zoom: 11, zoomControl: false });
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
   tileLayer = L.tileLayer(TILE_LIGHT, {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
@@ -1217,16 +1231,13 @@
   function updateDashboard() {
     if (!map || allData.length === 0) return;
     const bounds = map.getBounds();
-    let visGangnam = 0, visSongpa = 0;
+    let visible = 0;
     for (const d of allData) {
       if (isNaN(d._lat) || isNaN(d._lon)) continue;
-      if (!bounds.contains([d._lat, d._lon])) continue;
-      if (d._src.name === '강남구') visGangnam++; else visSongpa++;
+      if (bounds.contains([d._lat, d._lon])) visible++;
     }
     document.getElementById('dash-total').textContent   = allData.length.toLocaleString();
-    document.getElementById('dash-visible').textContent = (visGangnam + visSongpa).toLocaleString();
-    document.getElementById('dash-gangnam').textContent = visGangnam.toLocaleString();
-    document.getElementById('dash-songpa').textContent  = visSongpa.toLocaleString();
+    document.getElementById('dash-visible').textContent = visible.toLocaleString();
   }
 
   // ── 패널 토글 ────────────────────────────────────────
@@ -1245,18 +1256,26 @@
     try {
       const rows = await fetch('./data.json').then(r => r.json());
       const srcByName = Object.fromEntries(SOURCES.map(s => [s.name, s]));
-      allData = rows.map(row => Object.assign({}, row.detail || {}, {
-        _src:  srcByName[row.district] || SOURCES[0],
-        _lat:  row.lat,
-        _lon:  row.lon,
-        _addr: row.label,
-        _road: row.road,
-        geocode: row.geocode,
-      }));
-      for (const src of SOURCES) {
-        const el = document.getElementById(src.statId);
-        if (el) el.textContent = allData.filter(d => d._src === src).length.toLocaleString() + '개';
-      }
+      allData = rows.map(row => {
+        let src = srcByName[row.district];
+        if (!src) {
+          src = { name: row.district, color: '#2e7d52', dongBg: 'rgba(30,90,58,0.88)' };
+          SOURCES.push(src);
+          srcByName[row.district] = src;
+        }
+        return Object.assign({}, row.detail || {}, {
+          _src:  src,
+          _lat:  row.lat,
+          _lon:  row.lon,
+          _addr: row.label,
+          _road: row.road,
+          geocode: row.geocode,
+        });
+      });
+      const districtSet = new Set(allData.map(d => d._src.name));
+      document.getElementById('stat-total-count').textContent = allData.length.toLocaleString() + '개';
+      document.getElementById('stat-district-count').textContent = districtSet.size + '개구';
+      document.getElementById('info-districts').textContent = districtSet.size + '개 자치구';
       document.getElementById('loading').style.display = 'none';
       buildDongLayer();
       renderMarkers();
