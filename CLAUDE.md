@@ -71,7 +71,7 @@ python build_data.py
 - 지오코딩보다 **공식 좌표를 우선** 사용할 것
 - 중복 핀 배치 금지 — 같은 위치에 동일 내용의 핀이 여러 개 찍히면 안 됨
 - 배너(Ember and Blade)는 패널 하단, about 텍스트 위에 배치, 너비는 패널에 맞추고 높이는 잘리지 않게
-- 로드뷰 URL: `https://map.kakao.com/?map_type=TYPE_ROADVIEW&q=${lat},${lon}`
+- 로드뷰 URL: `https://map.kakao.com/link/roadview/${lat},${lon}`
 
 ### 삭제 가능한 파일
 - `regeocode.py`, `regeocode2.py` — 과거 지오코딩 스크립트, 더 이상 불필요

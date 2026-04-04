@@ -359,7 +359,8 @@
       font-size: 13px;
       color: var(--text-primary);
       font-weight: 500;
-      word-break: break-all;
+      word-break: keep-all;
+      overflow-wrap: break-word;
       line-height: 1.5;
     }
 
@@ -1051,7 +1052,7 @@
 
     const rwWrap = document.getElementById('detail-roadview-wrap');
     if (!isNaN(lat) && !isNaN(lon)) {
-      document.getElementById('detail-roadview-link').href = `https://map.kakao.com/?map_type=TYPE_ROADVIEW&q=${lat},${lon}`;
+      document.getElementById('detail-roadview-link').href = `https://map.kakao.com/link/roadview/${lat},${lon}`;
       rwWrap.style.display = 'block';
     } else {
       rwWrap.style.display = 'none';
