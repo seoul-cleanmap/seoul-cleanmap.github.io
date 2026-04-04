@@ -3,8 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>강남구 쓰레기통 지도</title>
+  <title>서울 클린맵 | Seoul Clean Map</title>
 
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -58,6 +63,19 @@
       --loading-bg: rgba(20,20,20,0.95);
       --toggle-bg: #2a2a2a;
       --nearest-border: #1e5c3a;
+    }
+
+    /* Leaflet 다크모드 */
+    body.dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
+    body.dark .leaflet-control-zoom a { background-color: var(--toggle-bg); color: var(--text-primary); border-color: var(--border-strong); }
+    body.dark .leaflet-control-zoom a:hover { background-color: var(--card-bg); }
+    body.dark .leaflet-bar { border-color: var(--border-strong); box-shadow: none; }
+
+    /* 클러스터 */
+    .custom-cluster {
+      background: var(--green); color: white; font-weight: 800; font-size: 13px;
+      border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 10px rgba(46,125,82,0.4);
+      display: flex; align-items: center; justify-content: center;
     }
 
     body {
@@ -525,7 +543,8 @@
 
     /* ── 동 집계 버블 ── */
     .dong-bubble {
-      display: inline-block;
+      position: absolute;
+      transform: translate(-50%, -50%);
       background: rgba(30, 90, 58, 0.88);
       color: white;
       border-radius: 14px;
@@ -540,7 +559,7 @@
     }
 
     .dong-bubble:hover {
-      transform: scale(1.08);
+      transform: translate(-50%, -50%) scale(1.08);
       box-shadow: 0 5px 18px rgba(0,0,0,0.3);
     }
 
@@ -747,7 +766,7 @@
     <div class="panel-logo">
       <div class="panel-logo-icon">🗑️</div>
       <div>
-        <h1>서울 쓰레기통 지도</h1>
+        <h1>서울 클린맵</h1>
         <span>강남구 · 송파구</span>
       </div>
     </div>
@@ -862,17 +881,19 @@
 <script>
   // ── 설정 ─────────────────────────────────────────────
   const SOURCES = [
-    { name: '강남구', statId: 'stat-gangnam', color: '#2e7d52', dongBg: 'rgba(30,90,58,0.88)' },
-    { name: '송파구', statId: 'stat-songpa',  color: '#1565C0', dongBg: 'rgba(21,60,130,0.88)' },
+    { name: '강남구', statId: 'stat-gangnam', color: '#2e7d52', pinInner: '#43a86d', dongBg: 'rgba(30,90,58,0.88)' },
+    { name: '송파구', statId: 'stat-songpa',  color: '#1565C0', pinInner: '#1976D2', dongBg: 'rgba(21,60,130,0.88)' },
   ];
 
   const CUSTOM_ICON_URL = './icon.png';
-  // Kakao: 레벨 >= DONG_THRESHOLD → 동 버블 / 레벨 < DONG_THRESHOLD → 개별 핀
-  const DONG_THRESHOLD = 5;
+  const DONG_THRESHOLD = 14;
+  const TILE_LIGHT = 'https://api.vworld.kr/req/wmts/1.0.0/89769725-F756-336D-B449-3060DDC54585/Base/{z}/{y}/{x}.png';
+  const TILE_DARK  = TILE_LIGHT; // 다크모드는 CSS filter로 처리
 
   // ── 다크모드 ──────────────────────────────────────────
   const systemDark  = window.matchMedia('(prefers-color-scheme: dark)');
   let   activeTheme = localStorage.getItem('theme') || 'system';
+  let   tileLayer   = null;
 
   function applyTheme(theme) {
     activeTheme = theme;
@@ -882,6 +903,7 @@
     document.querySelectorAll('.theme-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.theme === theme);
     });
+    if (tileLayer) tileLayer.setUrl(dark ? TILE_DARK : TILE_LIGHT);
   }
 
   document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -904,17 +926,23 @@
     return logs.length;
   };
 
+  // ── 지도 초기화 ──────────────────────────────────────
+  const map = L.map('map', { center: [37.5050, 127.0900], zoom: 14, zoomControl: false });
+  L.control.zoom({ position: 'bottomleft' }).addTo(map);
+  tileLayer = L.tileLayer(TILE_LIGHT, {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd', maxZoom: 19,
+  }).addTo(map);
+  applyTheme(activeTheme);  // 타일 URL 반영
+
   // ── 상태 ─────────────────────────────────────────────
-  let allData            = [];
-  let allMarkers         = [];
-  let markersInClusterer = false;
-  let clusterer          = null;
-  let dongOverlays       = [];
-  let myMarker           = null;
-  let userLatLng         = null;
-  let nearestItem        = null;
-  let listContext        = null;
-  let map                = null;
+  let allData       = [];
+  let markerCluster = null;
+  let dongLayer     = null;
+  let myMarker      = null;
+  let userLatLng    = null;
+  let nearestItem   = null;
+  let listContext   = null;
 
   // ── 거리 계산 ────────────────────────────────────────
   function distM(lat1, lon1, lat2, lon2) {
@@ -933,7 +961,7 @@
     if (document.body.classList.contains('panel-collapsed')) {
       document.body.classList.remove('panel-collapsed');
       panelToggleBtn.textContent = '▶';
-      setTimeout(() => map && map.relayout(), 360);
+      setTimeout(() => map && map.invalidateSize(), 360);
     }
   }
 
@@ -973,7 +1001,7 @@
     const lat = item._lat, lon = item._lon;
     const distWrap = document.getElementById('detail-dist-wrap');
     if (userLatLng && !isNaN(lat) && !isNaN(lon)) {
-      const d = distM(userLatLng.getLat(), userLatLng.getLng(), lat, lon);
+      const d = distM(userLatLng.lat, userLatLng.lng, lat, lon);
       document.getElementById('detail-dist').textContent = `📍 내 위치에서 ${fmtDist(d)}`;
       distWrap.style.display = 'block';
     } else {
@@ -1016,10 +1044,10 @@
     else showDefault();
   });
 
-  // ── 동 집계 오버레이 ─────────────────────────────────
-  function buildDongOverlays() {
-    dongOverlays.forEach(o => o.setMap(null));
-    dongOverlays = [];
+  // ── 동 집계 레이어 ───────────────────────────────────
+  function buildDongLayer() {
+    if (dongLayer) { map.removeLayer(dongLayer); dongLayer = null; }
+    dongLayer = L.layerGroup();
     for (const src of SOURCES) {
       const groups = {};
       for (const item of allData) {
@@ -1035,23 +1063,18 @@
       }
       for (const [dong, g] of Object.entries(groups)) {
         const lat = g.latSum / g.count, lon = g.lonSum / g.count;
-        const content = document.createElement('div');
-        content.style.cssText = 'display:inline-block;line-height:0;';
-        content.innerHTML = `<div class="dong-bubble" style="background:${src.dongBg};">
-          <div class="d-name">${dong}</div>
-          <div class="d-count">🗑️ ${g.count}개</div>
-        </div>`;
-        content.firstChild.addEventListener('click', () => {
-          map.setCenter(new kakao.maps.LatLng(lat, lon));
-          map.setLevel(DONG_THRESHOLD - 1, { animate: true });
+        const icon = L.divIcon({
+          className: '',
+          html: `<div class="dong-bubble" style="background:${src.dongBg};">
+            <div class="d-name">${dong}</div>
+            <div class="d-count">🗑️ ${g.count}개</div>
+          </div>`,
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
         });
-        dongOverlays.push(new kakao.maps.CustomOverlay({
-          position: new kakao.maps.LatLng(lat, lon),
-          content,
-          xAnchor: 0.5,
-          yAnchor: 0.5,
-          zIndex: 5,
-        }));
+        const m = L.marker([lat, lon], { icon, zIndexOffset: 500 });
+        m.on('click', () => map.flyTo([lat, lon], DONG_THRESHOLD, { animate: true, duration: 0.5 }));
+        dongLayer.addLayer(m);
       }
     }
   }
@@ -1059,52 +1082,68 @@
   // ── 줌 기반 레이어 전환 ───────────────────────────────
   function updateLayers() {
     if (!map) return;
-    const showDong = map.getLevel() >= DONG_THRESHOLD;
-    dongOverlays.forEach(o => o.setMap(showDong ? map : null));
-    if (clusterer && allMarkers.length > 0) {
-      if (showDong && markersInClusterer) {
-        clusterer.clear();
-        markersInClusterer = false;
-      } else if (!showDong && !markersInClusterer) {
-        clusterer.addMarkers(allMarkers);
-        markersInClusterer = true;
-      }
+    const showDong = map.getZoom() < DONG_THRESHOLD;
+    if (showDong) {
+      if (markerCluster && map.hasLayer(markerCluster)) map.removeLayer(markerCluster);
+      if (dongLayer && !map.hasLayer(dongLayer)) dongLayer.addTo(map);
+    } else {
+      if (dongLayer && map.hasLayer(dongLayer)) map.removeLayer(dongLayer);
+      if (markerCluster && !map.hasLayer(markerCluster)) markerCluster.addTo(map);
     }
   }
 
   // ── 개별 핀 마커 렌더링 ──────────────────────────────
   function renderMarkers(highlightItem = null) {
-    if (clusterer) { clusterer.clear(); markersInClusterer = false; }
-    allMarkers = [];
+    if (markerCluster) { map.removeLayer(markerCluster); markerCluster = null; }
+    markerCluster = L.markerClusterGroup({
+      maxClusterRadius: 50,
+      iconCreateFunction(cluster) {
+        const count = cluster.getChildCount();
+        const size = count < 10 ? 36 : count < 50 ? 42 : 48;
+        return L.divIcon({
+          html: `<div class="custom-cluster" style="width:${size}px;height:${size}px;">${count}</div>`,
+          className: '',
+          iconSize: [size, size],
+          iconAnchor: [size/2, size/2],
+        });
+      },
+    });
+    markerCluster.on('clusterclick', e => {
+      const items = e.layer.getAllChildMarkers().map(m => m._trashItem).filter(Boolean);
+      if (items.length <= 20) {
+        expandPanel();
+        showList(items, '이 위치의 쓰레기통');
+      } else {
+        map.zoomIn();
+      }
+    });
+
     for (const item of allData) {
       const lat = item._lat, lon = item._lon;
       if (isNaN(lat) || isNaN(lon)) continue;
-      const isHL  = highlightItem && item === highlightItem;
-      const size  = isHL ? 48 : 36;
-      const marker = new kakao.maps.Marker({
-        position: new kakao.maps.LatLng(lat, lon),
-        image: new kakao.maps.MarkerImage(
-          CUSTOM_ICON_URL,
-          new kakao.maps.Size(size, size),
-          { offset: new kakao.maps.Point(size / 2, size) }
-        ),
-        zIndex: isHL ? 10 : 1,
-        title:  item._addr || '',
+      const isHL = highlightItem && item === highlightItem;
+      const size = isHL ? 48 : 36;
+      const icon = L.icon({
+        iconUrl: CUSTOM_ICON_URL,
+        iconSize: [size, size],
+        iconAnchor: [size/2, size],
+        popupAnchor: [0, -size],
       });
+      const marker = L.marker([lat, lon], { icon, zIndexOffset: isHL ? 1000 : 0, title: item._addr || '' });
       marker._trashItem = item;
-      kakao.maps.event.addListener(marker, 'click', () => {
+      marker.on('click', () => {
         expandPanel();
         showDetail(item);
-        map.panTo(new kakao.maps.LatLng(lat, lon));
+        map.panTo([lat, lon]);
       });
-      allMarkers.push(marker);
+      markerCluster.addLayer(marker);
     }
     updateLayers();
   }
 
   // ── 가장 가까운 쓰레기통 ──────────────────────────────
   function findNearest(latlng) {
-    const uLat = latlng.getLat(), uLon = latlng.getLng();
+    const uLat = latlng.lat, uLon = latlng.lng;
     let minDist = Infinity, best = null;
     for (const item of allData) {
       if (isNaN(item._lat) || isNaN(item._lon)) continue;
@@ -1117,11 +1156,9 @@
   // ── 내 위치 ──────────────────────────────────────────
   function onLocate(latlng) {
     userLatLng = latlng;
-    if (myMarker) myMarker.setMap(null);
-    const dot = document.createElement('div');
-    dot.className = 'my-dot';
-    myMarker = new kakao.maps.CustomOverlay({ position: latlng, content: dot, yAnchor: 0.5, zIndex: 10 });
-    myMarker.setMap(map);
+    if (myMarker) { map.removeLayer(myMarker); myMarker = null; }
+    const myDotIcon = L.divIcon({ className: '', html: '<div class="my-dot"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
+    myMarker = L.marker(latlng, { icon: myDotIcon, zIndexOffset: 1000 }).addTo(map);
     if (allData.length === 0) return;
     const { item, dist } = findNearest(latlng);
     if (!item) return;
@@ -1132,8 +1169,7 @@
     document.getElementById('stat-nearest').textContent = fmtDist(dist);
     document.getElementById('nearest-card').style.display = 'block';
     document.getElementById('nc-go').onclick = () => {
-      map.setCenter(new kakao.maps.LatLng(item._lat, item._lon));
-      map.setLevel(2, { animate: true });
+      map.flyTo([item._lat, item._lon], 17, { animate: true, duration: 0.5 });
       showDetail(item);
     };
   }
@@ -1145,9 +1181,8 @@
     navigator.geolocation.getCurrentPosition(
       pos => {
         document.getElementById('locate-btn').innerHTML = '📍 가까운 쓰레기통 찾기';
-        const latlng = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-        map.setCenter(latlng);
-        map.setLevel(3, { animate: true });
+        const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+        map.flyTo(latlng, 17, { animate: true, duration: 0.8 });
         onLocate(latlng);
       },
       () => {
@@ -1173,7 +1208,7 @@
     let visGangnam = 0, visSongpa = 0;
     for (const d of allData) {
       if (isNaN(d._lat) || isNaN(d._lon)) continue;
-      if (!bounds.contain(new kakao.maps.LatLng(d._lat, d._lon))) continue;
+      if (!bounds.contains([d._lat, d._lon])) continue;
       if (d._src.name === '강남구') visGangnam++; else visSongpa++;
     }
     document.getElementById('dash-total').textContent   = allData.length.toLocaleString();
@@ -1186,25 +1221,15 @@
   panelToggleBtn.addEventListener('click', () => {
     const collapsed = document.body.classList.toggle('panel-collapsed');
     panelToggleBtn.textContent = collapsed ? '◀' : '▶';
-    setTimeout(() => map && map.relayout(), 360);
+    setTimeout(() => map && map.invalidateSize(), 360);
   });
 
-  // ── 초기화 조율 (데이터 + 지도 모두 준비되면 렌더) ──
-  let _dataReady = false;
-  let _mapReady  = false;
-  let _sdkFailed = false;
+  // ── 지도 이벤트 ──────────────────────────────────────
+  map.on('zoomend', () => { updateLayers(); updateDashboard(); });
+  map.on('moveend', updateDashboard);
 
-  function _tryRender() {
-    if (!_dataReady || !_mapReady) return;
-    document.getElementById('loading').style.display = 'none';
-    buildDongOverlays();
-    renderMarkers();
-    updateDashboard();
-    document.getElementById('location-modal').style.display = 'flex';
-  }
-
-  // ── 데이터 로드 (지도 SDK와 독립적으로 즉시 시작) ────
-  (async function loadData() {
+  // ── 데이터 로드 ──────────────────────────────────────
+  async function loadData() {
     try {
       const rows = await fetch('./data.json').then(r => r.json());
       const srcByName = Object.fromEntries(SOURCES.map(s => [s.name, s]));
@@ -1220,81 +1245,18 @@
         const el = document.getElementById(src.statId);
         if (el) el.textContent = allData.filter(d => d._src === src).length.toLocaleString() + '개';
       }
-      _dataReady = true;
-      if (!_sdkFailed) document.querySelector('#loading p').textContent = '지도를 불러오는 중...';
-      _tryRender();
+      document.getElementById('loading').style.display = 'none';
+      buildDongLayer();
+      renderMarkers();
+      updateDashboard();
+      document.getElementById('location-modal').style.display = 'flex';
     } catch (err) {
       console.error(err);
       document.getElementById('loading').innerHTML =
         `<p style="color:#e53935;font-size:14px;">데이터 로드 실패: ${err.message}</p>`;
     }
-  })();
-
-  // ── Kakao Maps SDK 동적 로드 (document.write 우회) ──
-  (function() {
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=f16e173e938e0313897327562afd35cf&libraries=clusterer&autoload=false';
-
-    script.onerror = function() {
-      _sdkFailed = true;
-      document.getElementById('loading').innerHTML =
-        `<p style="color:#e53935;font-size:14px;text-align:center;padding:20px;">
-          카카오 지도 SDK 로드 실패<br>
-          <span style="font-size:11px;color:#888;">앱키 또는 도메인 등록을 확인해주세요</span>
-        </p>`;
-    };
-
-    script.onload = function() {
-      kakao.maps.load(function() {
-        map = new kakao.maps.Map(document.getElementById('map'), {
-          center: new kakao.maps.LatLng(37.5050, 127.0900),
-          level: 7,
-        });
-
-        map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.BOTTOMLEFT);
-
-        clusterer = new kakao.maps.MarkerClusterer({
-          map,
-          averageCenter: true,
-          minLevel: 3,
-          disableClickZoom: true,
-          styles: [
-            { width:'36px', height:'36px', background:'#2e7d52', borderRadius:'50%',
-              border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'12px',
-              lineHeight:'30px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
-            { width:'42px', height:'42px', background:'#2e7d52', borderRadius:'50%',
-              border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'13px',
-              lineHeight:'36px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
-            { width:'48px', height:'48px', background:'#2e7d52', borderRadius:'50%',
-              border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'14px',
-              lineHeight:'42px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
-            { width:'48px', height:'48px', background:'#1a5c38', borderRadius:'50%',
-              border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'14px',
-              lineHeight:'42px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
-          ],
-        });
-
-        kakao.maps.event.addListener(clusterer, 'clusterclick', function(cluster) {
-          const items = cluster.getMarkers().map(m => m._trashItem).filter(Boolean);
-          if (items.length <= 20) {
-            expandPanel();
-            showList(items, '이 위치의 쓰레기통');
-          } else {
-            map.setLevel(map.getLevel() - 1, { animate: true });
-          }
-        });
-
-        kakao.maps.event.addListener(map, 'zoom_changed', () => { updateLayers(); updateDashboard(); });
-        kakao.maps.event.addListener(map, 'idle', updateDashboard);
-
-        _mapReady = true;
-        _tryRender();
-      });
-    };
-
-    document.head.appendChild(script);
-  })();
+  }
+  loadData();
 </script>
 </body>
 </html>
