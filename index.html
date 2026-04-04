@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>강남구 쓰레기통 지도</title>
 
-  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=f16e173e938e0313897327562afd35cf&libraries=clusterer"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1231,59 +1230,71 @@
     }
   })();
 
-  // ── Kakao Maps 초기화 (동기 로드) ───────────────────
-  if (typeof kakao === 'undefined' || typeof kakao.maps === 'undefined') {
-    _sdkFailed = true;
-    document.getElementById('loading').innerHTML =
-      `<p style="color:#e53935;font-size:14px;text-align:center;padding:20px;">
-        카카오 지도 SDK 로드 실패<br>
-        <span style="font-size:11px;color:#888;">JavaScript 앱키 또는 도메인 등록을 확인해주세요</span>
-      </p>`;
-  } else {
-    map = new kakao.maps.Map(document.getElementById('map'), {
-      center: new kakao.maps.LatLng(37.5050, 127.0900),
-      level: 7,
-    });
+  // ── Kakao Maps SDK 동적 로드 (document.write 우회) ──
+  (function() {
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=f16e173e938e0313897327562afd35cf&libraries=clusterer&autoload=false';
 
-    map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.BOTTOMLEFT);
+    script.onerror = function() {
+      _sdkFailed = true;
+      document.getElementById('loading').innerHTML =
+        `<p style="color:#e53935;font-size:14px;text-align:center;padding:20px;">
+          카카오 지도 SDK 로드 실패<br>
+          <span style="font-size:11px;color:#888;">앱키 또는 도메인 등록을 확인해주세요</span>
+        </p>`;
+    };
 
-    clusterer = new kakao.maps.MarkerClusterer({
-      map,
-      averageCenter: true,
-      minLevel: 3,
-      disableClickZoom: true,
-      styles: [
-        { width:'36px', height:'36px', background:'#2e7d52', borderRadius:'50%',
-          border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'12px',
-          lineHeight:'30px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
-        { width:'42px', height:'42px', background:'#2e7d52', borderRadius:'50%',
-          border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'13px',
-          lineHeight:'36px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
-        { width:'48px', height:'48px', background:'#2e7d52', borderRadius:'50%',
-          border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'14px',
-          lineHeight:'42px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
-        { width:'48px', height:'48px', background:'#1a5c38', borderRadius:'50%',
-          border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'14px',
-          lineHeight:'42px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
-      ],
-    });
+    script.onload = function() {
+      kakao.maps.load(function() {
+        map = new kakao.maps.Map(document.getElementById('map'), {
+          center: new kakao.maps.LatLng(37.5050, 127.0900),
+          level: 7,
+        });
 
-    kakao.maps.event.addListener(clusterer, 'clusterclick', function(cluster) {
-      const items = cluster.getMarkers().map(m => m._trashItem).filter(Boolean);
-      if (items.length <= 20) {
-        expandPanel();
-        showList(items, '이 위치의 쓰레기통');
-      } else {
-        map.setLevel(map.getLevel() - 1, { animate: true });
-      }
-    });
+        map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.BOTTOMLEFT);
 
-    kakao.maps.event.addListener(map, 'zoom_changed', () => { updateLayers(); updateDashboard(); });
-    kakao.maps.event.addListener(map, 'idle', updateDashboard);
+        clusterer = new kakao.maps.MarkerClusterer({
+          map,
+          averageCenter: true,
+          minLevel: 3,
+          disableClickZoom: true,
+          styles: [
+            { width:'36px', height:'36px', background:'#2e7d52', borderRadius:'50%',
+              border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'12px',
+              lineHeight:'30px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
+            { width:'42px', height:'42px', background:'#2e7d52', borderRadius:'50%',
+              border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'13px',
+              lineHeight:'36px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
+            { width:'48px', height:'48px', background:'#2e7d52', borderRadius:'50%',
+              border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'14px',
+              lineHeight:'42px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
+            { width:'48px', height:'48px', background:'#1a5c38', borderRadius:'50%',
+              border:'3px solid #fff', color:'#fff', fontWeight:'800', fontSize:'14px',
+              lineHeight:'42px', textAlign:'center', boxShadow:'0 2px 10px rgba(46,125,82,0.4)' },
+          ],
+        });
 
-    _mapReady = true;
-    _tryRender();
-  }
+        kakao.maps.event.addListener(clusterer, 'clusterclick', function(cluster) {
+          const items = cluster.getMarkers().map(m => m._trashItem).filter(Boolean);
+          if (items.length <= 20) {
+            expandPanel();
+            showList(items, '이 위치의 쓰레기통');
+          } else {
+            map.setLevel(map.getLevel() - 1, { animate: true });
+          }
+        });
+
+        kakao.maps.event.addListener(map, 'zoom_changed', () => { updateLayers(); updateDashboard(); });
+        kakao.maps.event.addListener(map, 'idle', updateDashboard);
+
+        _mapReady = true;
+        _tryRender();
+      });
+    };
+
+    document.head.appendChild(script);
+  })();
 </script>
 </body>
 </html>
