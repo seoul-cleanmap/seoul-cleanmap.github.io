@@ -69,6 +69,15 @@
     body.dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
     body.dark .leaflet-control-zoom a { background-color: var(--toggle-bg); color: var(--text-primary); border-color: var(--border-strong); }
     body.dark .leaflet-control-zoom a:hover { background-color: var(--card-bg); }
+    #btn-goto-me {
+      display: none;
+      width: 34px; height: 34px;
+      background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px;
+      font-size: 18px; line-height: 30px; text-align: center;
+      cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+    }
+    #btn-goto-me:hover { background: #f4f4f4; }
+    body.dark #btn-goto-me { background: var(--toggle-bg); border-color: var(--border-strong); }
     body.dark .leaflet-bar { border-color: var(--border-strong); box-shadow: none; }
 
     /* 클러스터 */
@@ -958,6 +967,23 @@
   // ── 지도 초기화 ──────────────────────────────────────
   const map = L.map('map', { center: [37.5550, 126.9800], zoom: 11, zoomControl: false });
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+  // 내 위치로 돌아가기 버튼
+  const GotoMeControl = L.Control.extend({
+    options: { position: 'bottomleft' },
+    onAdd() {
+      const btn = L.DomUtil.create('button', '');
+      btn.id = 'btn-goto-me';
+      btn.title = '내 위치로 돌아가기';
+      btn.innerHTML = '📍';
+      L.DomEvent.on(btn, 'click', L.DomEvent.stopPropagation);
+      L.DomEvent.on(btn, 'click', () => {
+        if (userLatLng) map.flyTo(userLatLng, 17, { animate: true, duration: 0.6 });
+      });
+      return btn;
+    }
+  });
+  new GotoMeControl().addTo(map);
   tileLayer = L.tileLayer(TILE_LIGHT, {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
     subdomains: 'abcd', maxZoom: 19,
@@ -1175,6 +1201,7 @@
   // ── 내 위치 ──────────────────────────────────────────
   function onLocate(latlng) {
     userLatLng = latlng;
+    document.getElementById('btn-goto-me').style.display = 'block';
     if (myMarker) { map.removeLayer(myMarker); myMarker = null; }
     const myDotIcon = L.divIcon({ className: '', html: '<div class="my-dot"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
     myMarker = L.marker(latlng, { icon: myDotIcon, zIndexOffset: 1000 }).addTo(map);
