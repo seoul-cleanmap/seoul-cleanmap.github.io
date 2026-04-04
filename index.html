@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>강남구 쓰레기통 지도</title>
 
-  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=f16e173e938e0313897327562afd35cf&libraries=clusterer&autoload=false"></script>
+  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=f16e173e938e0313897327562afd35cf&libraries=clusterer"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1231,8 +1231,8 @@
     }
   })();
 
-  // ── Kakao Maps 초기화 ────────────────────────────────
-  if (typeof kakao === 'undefined') {
+  // ── Kakao Maps 초기화 (동기 로드) ───────────────────
+  if (typeof kakao === 'undefined' || typeof kakao.maps === 'undefined') {
     _sdkFailed = true;
     document.getElementById('loading').innerHTML =
       `<p style="color:#e53935;font-size:14px;text-align:center;padding:20px;">
@@ -1240,7 +1240,6 @@
         <span style="font-size:11px;color:#888;">JavaScript 앱키 또는 도메인 등록을 확인해주세요</span>
       </p>`;
   } else {
-  kakao.maps.load(function() {
     map = new kakao.maps.Map(document.getElementById('map'), {
       center: new kakao.maps.LatLng(37.5050, 127.0900),
       level: 7,
@@ -1284,8 +1283,7 @@
 
     _mapReady = true;
     _tryRender();
-  });
-  } // end else (kakao defined)
+  }
 </script>
 </body>
 </html>
