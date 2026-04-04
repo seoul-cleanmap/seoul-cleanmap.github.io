@@ -70,7 +70,6 @@
     body.dark .leaflet-control-zoom a { background-color: var(--toggle-bg); color: var(--text-primary); border-color: var(--border-strong); }
     body.dark .leaflet-control-zoom a:hover { background-color: var(--card-bg); }
     #btn-goto-me {
-      display: none;
       width: 34px; height: 34px;
       background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px;
       font-size: 18px; line-height: 30px; text-align: center;
@@ -1006,6 +1005,7 @@
       L.DomEvent.on(btn, 'click', L.DomEvent.stopPropagation);
       L.DomEvent.on(btn, 'click', () => {
         if (userLatLng) map.flyTo(userLatLng, 17, { animate: true, duration: 0.6 });
+        else requestLocation();
       });
       return btn;
     }
@@ -1231,7 +1231,6 @@
   // ── 내 위치 ──────────────────────────────────────────
   function onLocate(latlng) {
     userLatLng = latlng;
-    document.getElementById('btn-goto-me').style.display = 'block';
     if (myMarker) { map.removeLayer(myMarker); myMarker = null; }
     const myDotIcon = L.divIcon({ className: '', html: '<div class="my-dot"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
     myMarker = L.marker(latlng, { icon: myDotIcon, zIndexOffset: 1000 }).addTo(map);
