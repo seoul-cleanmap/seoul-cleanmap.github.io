@@ -1264,7 +1264,11 @@
           SOURCES.push(src);
           srcByName[row.district] = src;
         }
-        return Object.assign({}, row.detail || {}, {
+        const display = {};
+        if (row.road)       display['도로명']   = row.road;
+        if (row.place_type) display['장소유형'] = row.place_type;
+        if (row.kind)       display['종류']     = row.kind;
+        return Object.assign(display, {
           _src:  src,
           _lat:  row.lat,
           _lon:  row.lon,
