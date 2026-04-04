@@ -636,6 +636,44 @@
     }
 
     /* ── 패널 하단 (소개 + 배너) ── */
+    /* ── 검색창 ── */
+    #search-bar {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-bg);
+    }
+    #search-input {
+      width: 100%;
+      padding: 8px 32px 8px 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      font-size: 13px;
+      background: var(--card-bg);
+      color: var(--text-primary);
+      outline: none;
+      box-sizing: border-box;
+    }
+    #search-input:focus { border-color: var(--green); }
+    #search-input::placeholder { color: var(--text-muted); }
+    #search-wrap { position: relative; }
+    #search-clear {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: var(--text-muted); font-size: 15px; display: none; line-height: 1;
+    }
+    /* ── 검색 결과 ── */
+    #view-search { display: none; }
+    .search-count { font-size: 11px; color: var(--text-muted); padding: 8px 14px 4px; }
+    .search-item {
+      padding: 9px 14px; border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .search-item:hover { background: var(--card-bg); }
+    .search-item-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+    .search-item-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+    .search-highlight { color: var(--green); font-weight: 700; }
+    /* ── 패널 footer ── */
     .panel-footer {
       flex-shrink: 0;
       border-top: 1px solid var(--border);
@@ -815,7 +853,21 @@
     </div>
   </div>
 
+  <!-- 검색창 (항상 표시) -->
+  <div id="search-bar">
+    <div id="search-wrap">
+      <input type="search" id="search-input" placeholder="장소명, 도로명, 자치구 검색...">
+      <button id="search-clear" title="지우기">✕</button>
+    </div>
+  </div>
+
   <div class="panel-body">
+
+    <!-- 검색 결과 화면 -->
+    <div id="view-search">
+      <div class="search-count" id="search-count"></div>
+      <div id="search-results"></div>
+    </div>
 
     <!-- 기본 화면 -->
     <div id="view-default">
@@ -1294,6 +1346,73 @@
     const collapsed = document.body.classList.toggle('panel-collapsed');
     panelToggleBtn.textContent = collapsed ? '◀' : '▶';
     setTimeout(() => map && map.invalidateSize(), 360);
+  });
+
+  // ── 검색 ─────────────────────────────────────────────
+  const searchInput = document.getElementById('search-input');
+  const searchClear = document.getElementById('search-clear');
+  const viewSearch  = document.getElementById('view-search');
+  const viewDefault = document.getElementById('view-default');
+  const viewList    = document.getElementById('view-list');
+  const viewDetail  = document.getElementById('view-detail');
+
+  function highlight(text, q) {
+    if (!q) return text;
+    const idx = text.toLowerCase().indexOf(q.toLowerCase());
+    if (idx < 0) return text;
+    return text.slice(0, idx)
+      + `<span class="search-highlight">${text.slice(idx, idx + q.length)}</span>`
+      + text.slice(idx + q.length);
+  }
+
+  function runSearch(q) {
+    q = q.trim();
+    searchClear.style.display = q ? 'block' : 'none';
+    if (!q) {
+      viewSearch.style.display = 'none';
+      viewDefault.style.display = 'block';
+      return;
+    }
+    const ql = q.toLowerCase();
+    const results = allData.filter(d =>
+      (d._addr  || '').toLowerCase().includes(ql) ||
+      (d._road  || '').toLowerCase().includes(ql) ||
+      (d._src && d._src.name || '').toLowerCase().includes(ql)
+    ).slice(0, 30);
+
+    viewDefault.style.display = 'none';
+    viewList.style.display    = 'none';
+    viewDetail.style.display  = 'none';
+    viewSearch.style.display  = 'block';
+
+    document.getElementById('search-count').textContent =
+      results.length ? `검색 결과 ${results.length}건${results.length === 30 ? ' (상위 30건)' : ''}` : '결과 없음';
+
+    const container = document.getElementById('search-results');
+    container.innerHTML = '';
+    results.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'search-item';
+      div.innerHTML = `
+        <div class="search-item-label">${highlight(item._addr || '(이름 없음)', q)}</div>
+        <div class="search-item-sub">${item._src ? item._src.name : ''} · ${highlight(item._road || '', q)}</div>`;
+      div.addEventListener('click', () => {
+        map.flyTo([item._lat, item._lon], 17, { animate: true, duration: 0.6 });
+        expandPanel();
+        showDetail(item);
+        searchInput.value = '';
+        searchClear.style.display = 'none';
+        viewSearch.style.display = 'none';
+      });
+      container.appendChild(div);
+    });
+  }
+
+  searchInput.addEventListener('input', debounce(() => runSearch(searchInput.value), 200));
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    runSearch('');
+    searchInput.focus();
   });
 
   // ── 지도 이벤트 ──────────────────────────────────────
