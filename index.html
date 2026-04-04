@@ -1130,7 +1130,8 @@
     document.getElementById('view-detail').style.display  = 'block';
 
     document.getElementById('detail-title').textContent    = item._addr || '쓰레기통';
-    document.getElementById('detail-subtitle').textContent = item._src.name;
+    document.getElementById('detail-subtitle').textContent =
+      (item._id ? `No.${item._id} · ` : '') + item._src.name;
 
     const lat = item._lat, lon = item._lon;
     const distWrap = document.getElementById('detail-dist-wrap');
@@ -1440,6 +1441,7 @@
         if (row.place_type) display['장소유형'] = row.place_type;
         if (row.kind)       display['종류']     = row.kind;
         return Object.assign(display, {
+          _id:   row.id,
           _src:  src,
           _lat:  row.lat,
           _lon:  row.lon,
