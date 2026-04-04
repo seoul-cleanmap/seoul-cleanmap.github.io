@@ -9,12 +9,10 @@
   2. python verify_geocode.py
   3. verify_result.csv 확인 (Excel에서 열기 권장)
 
-카카오 REST API 키 발급:
-  https://developers.kakao.com → 앱 만들기 → 앱 키 → REST API 키
 """
 import json, csv, time, math, urllib.request, urllib.parse, sys
 
-KAKAO_API_KEY = ""   # ← 여기에 카카오 REST API 키 입력
+KAKAO_API_KEY = "553e2e606a80c405fff3f61fa3adc613"
 INPUT      = "data.json"
 OUTPUT_CSV = "verify_result.csv"
 THRESHOLD_SUSPECT = 200  # 이 거리(m) 이상 차이나면 SUSPECT
