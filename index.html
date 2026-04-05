@@ -153,33 +153,6 @@
       font-weight: 400;
     }
 
-    /* 통계 배지 */
-    .stat-row {
-      display: flex;
-      gap: 8px;
-    }
-
-    .stat-badge {
-      flex: 1;
-      background: var(--green-pale);
-      border-radius: 10px;
-      padding: 8px 10px;
-      text-align: center;
-    }
-
-    .stat-badge .num {
-      font-size: clamp(13px, 4vw, 18px);
-      font-weight: 800;
-      color: var(--green);
-      display: block;
-      white-space: nowrap;
-    }
-
-    .stat-badge .label {
-      font-size: 10px;
-      color: var(--text-secondary);
-      margin-top: 1px;
-    }
 
     /* 패널 바디 (스크롤 가능) */
     .panel-body {
@@ -958,20 +931,6 @@
         <span>서울시 공공 쓰레기통</span>
       </div>
     </div>
-    <div class="stat-row">
-      <div class="stat-badge" style="border-left: 3px solid #2e7d52;">
-        <span class="num" id="stat-total-count">-</span>
-        <div class="label">전체</div>
-      </div>
-      <div class="stat-badge" style="border-left: 3px solid #1565C0;">
-        <span class="num" id="stat-district-count">-</span>
-        <div class="label">자치구</div>
-      </div>
-      <div class="stat-badge">
-        <span class="num" id="stat-nearest">-</span>
-        <div class="label">내 위치 거리</div>
-      </div>
-    </div>
   </div>
 
   <!-- 검색창 (항상 표시) -->
@@ -1558,7 +1517,6 @@
     renderMarkers(item);
     document.getElementById('nc-addr').textContent = `[${item._src.name}] ${item._addr || '주소 없음'}`;
     document.getElementById('nc-dist').textContent = `내 위치에서 ${fmtDist(dist)}`;
-    document.getElementById('stat-nearest').textContent = fmtDist(dist);
     document.getElementById('nearest-card').style.display = 'block';
     document.getElementById('nc-go').onclick = () => {
       map.flyTo([item._lat, item._lon], 17, { animate: true, duration: 0.5 });
@@ -1733,8 +1691,6 @@
         });
       });
       const districtSet = new Set(allData.map(d => d._src.name));
-      document.getElementById('stat-total-count').textContent = allData.length.toLocaleString() + '개';
-      document.getElementById('stat-district-count').textContent = districtSet.size + '개구';
       document.getElementById('info-districts').textContent = districtSet.size + '개 자치구';
       document.getElementById('loading').style.display = 'none';
       buildDongLayer();
