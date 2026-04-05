@@ -1414,7 +1414,7 @@
       setMobileState('detail');
       if (!isNaN(lat) && !isNaN(lon)) {
         const panelH = window.innerHeight * 0.50;
-        const offsetY = Math.round(panelH / 2);
+        const offsetY = Math.round(panelH * 0.75);
         map.panTo([lat, lon], { animate: true });
         map.panBy([0, offsetY], { animate: false });
       }
