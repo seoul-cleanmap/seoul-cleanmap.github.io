@@ -738,6 +738,10 @@
       flex-shrink: 0;
       border-top: 1px solid var(--border);
     }
+    .detail-footer-scroll {
+      margin-top: 20px;
+      border-top: 1px solid var(--border);
+    }
     .data-attribution {
       padding: 10px 14px 6px;
       font-size: 11px;
@@ -881,12 +885,24 @@
         max-height: 55vh;
         border-radius: 20px 20px 0 0;
         box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
-        transform: translateY(calc(100% - 52px));
+        transform: translateY(100%);
         transition: transform 0.32s ease;
         overflow: hidden;
       }
-      #panel.mobile-open {
+      /* 상태 A: 개요+검색 노출 */
+      #panel.mobile-overview {
         transform: translateY(0);
+      }
+      /* 상태 B: 핀 상세 — 헤더·검색 숨기고 스크롤 공간 최대화 */
+      #panel.mobile-detail {
+        transform: translateY(0);
+        max-height: 80vh;
+      }
+      #panel.mobile-detail .panel-header,
+      #panel.mobile-detail #search-bar,
+      #panel.mobile-detail .panel-footer { display: none; }
+      #panel.mobile-detail .panel-body {
+        max-height: calc(80vh - 24px);
       }
       .panel-header { padding: 0 16px 10px; border-bottom: 1px solid var(--border); }
       .panel-body {
@@ -1027,6 +1043,19 @@
       <div class="detail-fields" id="detail-fields"></div>
       <button id="btn-goto-pin">🎯 핀 위치로 이동</button>
       <button class="error-report-btn" id="error-report-btn">⚠️ 이 핀의 오류 제보하기</button>
+
+      <!-- 모바일 detail 스크롤 하단 출처+배너 -->
+      <div class="detail-footer-scroll">
+        <div class="data-attribution">
+          <div>📂 <a href="https://data.seoul.go.kr/dataList/OA-2705/S/1/datasetView.do" target="_blank" rel="noopener">서울시 가로쓰레기통 설치정보</a></div>
+          <div>📂 <a href="https://www.data.go.kr/data/15013752/standard.do" target="_blank" rel="noopener">전국휴지통표준데이터</a></div>
+          <div class="data-warn">⚠️ 일부 좌표는 도로명주소 기반 지오코딩으로,<br>실제 위치와 최대 수백 m 오차가 있을 수 있습니다.</div>
+        </div>
+        <a href="https://store.steampowered.com/app/3470500/Ember_and_Blade/?utm_source=trashcanmap&utm_medium=banner&utm_campaign=dashboard" target="_blank" rel="noopener" style="position:relative;display:block;">
+          <img src="./emberandblade_banner.jpg" alt="Ember and Blade - Steam" style="width:100%;display:block;" />
+          <span class="dash-banner-label">AD</span>
+        </a>
+      </div>
     </div>
 
   </div>
@@ -1245,6 +1274,16 @@
   let userLatLng    = null;
   let nearestItem   = null;
   let listContext   = null;
+  let mobileState   = 'map-only'; // map-only | overview | detail
+
+  function setMobileState(state) {
+    if (window.innerWidth > 680) return;
+    mobileState = state;
+    const panel = document.getElementById('panel');
+    panel.classList.remove('mobile-overview', 'mobile-detail');
+    if (state === 'overview') panel.classList.add('mobile-overview');
+    else if (state === 'detail') panel.classList.add('mobile-detail');
+  }
 
   // ── 거리 계산 ────────────────────────────────────────
   function distM(lat1, lon1, lat2, lon2) {
@@ -1261,7 +1300,7 @@
   const panelToggleBtn = document.getElementById('panel-toggle');
   function expandPanel() {
     if (window.innerWidth <= 680) {
-      document.getElementById('panel').classList.add('mobile-open');
+      setMobileState('overview');
     } else if (document.body.classList.contains('panel-collapsed')) {
       document.body.classList.remove('panel-collapsed');
       panelToggleBtn.textContent = '▶';
@@ -1271,8 +1310,7 @@
 
   // 모바일 핸들 토글
   document.getElementById('mobile-handle').addEventListener('click', () => {
-    const panel = document.getElementById('panel');
-    panel.classList.toggle('mobile-open');
+    if (window.innerWidth <= 680) setMobileState(mobileState === 'map-only' ? 'overview' : 'map-only');
   });
 
   // ── 뷰 전환 ──────────────────────────────────────────
@@ -1360,12 +1398,12 @@
       }
     }
 
-    // 모바일: 패널 열기 + 핀을 화면 상단 절반 중앙에 배치
+    // 모바일: detail 상태로 전환 + 핀을 화면 상단 20vh 중앙에 배치
     const isMobile = window.innerWidth <= 680;
     if (isMobile) {
-      document.getElementById('panel').classList.add('mobile-open');
+      setMobileState('detail');
       if (!isNaN(lat) && !isNaN(lon)) {
-        const panelH = window.innerHeight * 0.55;
+        const panelH = window.innerHeight * 0.80;
         const offsetY = Math.round(panelH / 2);
         map.panTo([lat, lon], { animate: true });
         map.panBy([0, offsetY], { animate: false });
@@ -1381,7 +1419,7 @@
     currentDetailItem = null;
     if (highlightMarker) { highlightMarker.setIcon(highlightMarker._origIcon); highlightMarker = null; }
     document.getElementById('btn-goto-pin').style.display = 'none';
-    if (window.innerWidth <= 680) document.getElementById('panel').classList.remove('mobile-open');
+    if (window.innerWidth <= 680) setMobileState('overview');
     document.getElementById('view-default').style.display = 'block';
     document.getElementById('view-detail').style.display  = 'none';
     document.getElementById('view-list').style.display    = 'none';
@@ -1636,6 +1674,12 @@
   }
   const debouncedDashboard = debounce(updateDashboard, 150);
   map.on('zoomend', () => { updateLayers(); debouncedDashboard(); });
+  // 모바일: 빈 지도 영역 탭 → map-only ↔ overview 토글
+  map.on('click', () => {
+    if (window.innerWidth > 680) return;
+    if (mobileState === 'detail') { showDefault(); }
+    else { setMobileState(mobileState === 'map-only' ? 'overview' : 'map-only'); }
+  });
   map.on('moveend', () => {
     debouncedDashboard();
     if (currentDetailItem && !isNaN(currentDetailItem._lat)) {
@@ -1683,6 +1727,7 @@
       buildDongLayer();
       renderMarkers();
       updateDashboard();
+      setMobileState('overview');
       document.getElementById('location-modal').style.display = 'flex';
     } catch (err) {
       console.error(err);
