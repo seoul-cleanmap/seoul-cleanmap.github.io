@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>서울 클린맵 관리자</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; }
+
+    /* 로그인 */
+    #login-screen {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    }
+    .login-box {
+      background: white; border-radius: 16px; padding: 40px 32px;
+      width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    .login-box h1 { font-size: 20px; margin-bottom: 6px; }
+    .login-box p { font-size: 13px; color: #888; margin-bottom: 24px; }
+    .login-box input {
+      width: 100%; padding: 10px 12px; border: 1px solid #ddd;
+      border-radius: 8px; font-size: 14px; margin-bottom: 10px;
+    }
+    .login-box input:focus { outline: none; border-color: #2e7d52; }
+    .login-btn {
+      width: 100%; padding: 12px; background: #2e7d52; color: white;
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .login-btn:hover { background: #256644; }
+    .login-error { color: #e53935; font-size: 13px; margin-top: 8px; }
+
+    /* 어드민 */
+    #admin-screen { display: none; min-height: 100vh; }
+    header {
+      background: #2e7d52; color: white;
+      padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 16px; font-weight: 700; }
+    .logout-btn {
+      background: rgba(255,255,255,0.2); border: none; color: white;
+      padding: 6px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+    }
+    .logout-btn:hover { background: rgba(255,255,255,0.3); }
+
+    /* 탭 */
+    .tabs { background: white; border-bottom: 1px solid #e0e0e0; display: flex; padding: 0 24px; }
+    .tab {
+      padding: 12px 20px; font-size: 14px; font-weight: 600; cursor: pointer;
+      border-bottom: 3px solid transparent; color: #888;
+    }
+    .tab.active { color: #2e7d52; border-bottom-color: #2e7d52; }
+    .badge {
+      display: inline-block; background: #e53935; color: white;
+      font-size: 11px; font-weight: 700; border-radius: 10px;
+      padding: 1px 6px; margin-left: 6px;
+    }
+
+    /* 레이아웃 */
+    .admin-body { display: flex; height: calc(100vh - 95px); }
+    .list-pane {
+      width: 400px; flex-shrink: 0; overflow-y: auto;
+      background: white; border-right: 1px solid #e0e0e0;
+    }
+    .map-pane { flex: 1; }
+    #admin-map { width: 100%; height: 100%; }
+
+    /* 목록 */
+    .list-empty { padding: 40px 24px; text-align: center; color: #aaa; font-size: 14px; }
+    .report-item {
+      padding: 14px 16px; border-bottom: 1px solid #f0f0f0;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .report-item:hover { background: #f9f9f9; }
+    .report-item.selected { background: #e8f5ee; }
+    .ri-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    .ri-type {
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    }
+    .ri-type.new { background: #e3f2fd; color: #1565c0; }
+    .ri-type.error { background: #fce4ec; color: #c62828; }
+    .ri-time { font-size: 11px; color: #aaa; }
+    .ri-label { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+    .ri-sub { font-size: 12px; color: #888; }
+    .ri-memo { font-size: 12px; color: #555; margin-top: 4px; padding: 6px 8px; background: #f5f5f5; border-radius: 6px; }
+
+    /* 상세 액션 */
+    .detail-pane {
+      position: absolute; bottom: 20px; right: 20px;
+      background: white; border-radius: 14px; padding: 16px 18px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15); min-width: 280px; z-index: 1000;
+    }
+    .detail-pane h3 { font-size: 14px; margin-bottom: 12px; color: #333; }
+    .action-row { display: flex; gap: 8px; }
+    .btn-approve {
+      flex: 1; padding: 10px; background: #2e7d52; color: white;
+      border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .btn-approve:hover { background: #256644; }
+    .btn-reject {
+      flex: 1; padding: 10px; background: white; color: #e53935;
+      border: 2px solid #e53935; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .btn-reject:hover { background: #fce4ec; }
+    .detail-info { font-size: 12px; color: #666; margin-bottom: 12px; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+<!-- 로그인 화면 -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>🗑️ 서울 클린맵</h1>
+    <p>관리자 페이지</p>
+    <input type="email" id="login-email" placeholder="이메일">
+    <input type="password" id="login-pw" placeholder="비밀번호">
+    <button class="login-btn" id="login-btn">로그인</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- 어드민 화면 -->
+<div id="admin-screen">
+  <header>
+    <h1>서울 클린맵 관리자</h1>
+    <button class="logout-btn" id="logout-btn">로그아웃</button>
+  </header>
+  <div class="tabs">
+    <div class="tab active" data-tab="submissions">
+      신규 제보 <span class="badge" id="badge-submissions">0</span>
+    </div>
+    <div class="tab" data-tab="error_reports">
+      오류 제보 <span class="badge" id="badge-errors">0</span>
+    </div>
+  </div>
+  <div class="admin-body">
+    <div class="list-pane" id="list-pane">
+      <div class="list-empty">로딩 중...</div>
+    </div>
+    <div class="map-pane" style="position:relative;">
+      <div id="admin-map"></div>
+      <div class="detail-pane" id="detail-pane" style="display:none;">
+        <h3 id="detail-title"></h3>
+        <div class="detail-info" id="detail-info"></div>
+        <div class="action-row">
+          <button class="btn-approve" id="btn-approve">✅ 승인</button>
+          <button class="btn-reject" id="btn-reject">❌ 반려</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyCIZaB3qkNGcW-HVkRszAehjzvvs7Eb52E",
+    authDomain: "seoul-cleanmap.firebaseapp.com",
+    projectId: "seoul-cleanmap",
+    storageBucket: "seoul-cleanmap.firebasestorage.app",
+    messagingSenderId: "48323704997",
+    appId: "1:48323704997:web:1ca7ba27b735be3873f54c"
+  });
+  const db   = firebase.firestore();
+  const auth = firebase.auth();
+
+  // ── 로그인 ──
+  document.getElementById('login-btn').addEventListener('click', async () => {
+    const email = document.getElementById('login-email').value.trim();
+    const pw    = document.getElementById('login-pw').value;
+    document.getElementById('login-error').textContent = '';
+    try {
+      await auth.signInWithEmailAndPassword(email, pw);
+    } catch (e) {
+      document.getElementById('login-error').textContent = '로그인 실패: ' + e.message;
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
+
+  auth.onAuthStateChanged(user => {
+    document.getElementById('login-screen').style.display = user ? 'none' : 'flex';
+    document.getElementById('admin-screen').style.display = user ? 'block' : 'none';
+    if (user) initAdmin();
+  });
+
+  // ── 지도 초기화 ──
+  let adminMap, markerCur, markerRef;
+  function initMap() {
+    if (adminMap) return;
+    adminMap = L.map('admin-map').setView([37.555, 126.98], 13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap © CARTO', maxZoom: 19
+    }).addTo(adminMap);
+  }
+
+  // ── 어드민 초기화 ──
+  let currentTab = 'submissions';
+  let selectedId = null;
+  let allItems   = [];
+
+  function initAdmin() {
+    setTimeout(() => { initMap(); }, 100);
+    loadTab('submissions');
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentTab = tab.dataset.tab;
+        selectedId = null;
+        document.getElementById('detail-pane').style.display = 'none';
+        loadTab(currentTab);
+      });
+    });
+  }
+
+  function loadTab(col) {
+    document.getElementById('list-pane').innerHTML = '<div class="list-empty">로딩 중...</div>';
+    db.collection(col).where('status', '==', 'pending')
+      .orderBy('createdAt', 'desc').get()
+      .then(snap => {
+        allItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const badgeId = col === 'submissions' ? 'badge-submissions' : 'badge-errors';
+        document.getElementById(badgeId).textContent = allItems.length;
+        renderList(allItems, col);
+      });
+  }
+
+  function fmtTime(ts) {
+    if (!ts) return '';
+    const d = ts.toDate();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
+  function renderList(items, col) {
+    const pane = document.getElementById('list-pane');
+    if (!items.length) {
+      pane.innerHTML = '<div class="list-empty">대기 중인 제보가 없습니다.</div>';
+      return;
+    }
+    pane.innerHTML = '';
+    items.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'report-item' + (item.id === selectedId ? ' selected' : '');
+      const isNew = col === 'submissions';
+      const label = isNew
+        ? `📍 ${item.lat?.toFixed(5)}, ${item.lon?.toFixed(5)}`
+        : `No.${item.pinId} · ${item.pinLabel} (${item.district})`;
+      const sub = isNew
+        ? `제보자: ${item.nickname || '익명'}`
+        : `${item.errorType} · ${item.nickname || '익명'}`;
+      div.innerHTML = `
+        <div class="ri-header">
+          <span class="ri-type ${isNew ? 'new' : 'error'}">${isNew ? '신규 제보' : '오류 제보'}</span>
+          <span class="ri-time">${fmtTime(item.createdAt)}</span>
+        </div>
+        <div class="ri-label">${label}</div>
+        <div class="ri-sub">${sub}</div>
+        ${item.memo ? `<div class="ri-memo">${item.memo}</div>` : ''}`;
+      div.addEventListener('click', () => selectItem(item, col));
+      pane.appendChild(div);
+    });
+  }
+
+  function selectItem(item, col) {
+    selectedId = item.id;
+    renderList(allItems, col);
+
+    if (markerCur) { adminMap.removeLayer(markerCur); markerCur = null; }
+    if (markerRef)  { adminMap.removeLayer(markerRef);  markerRef = null; }
+
+    const isNew = col === 'submissions';
+    if (isNew) {
+      markerCur = L.marker([item.lat, item.lon], {
+        icon: L.divIcon({ html: '<div style="width:14px;height:14px;background:#1565c0;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>', className: '', iconSize:[14,14], iconAnchor:[7,7] })
+      }).addTo(adminMap).bindPopup(`신규 제보<br>${item.nickname || '익명'}`).openPopup();
+      adminMap.setView([item.lat, item.lon], 17);
+    } else {
+      markerRef = L.marker([item.lat, item.lon], {
+        icon: L.divIcon({ html: '<div style="width:14px;height:14px;background:#e53935;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>', className: '', iconSize:[14,14], iconAnchor:[7,7] })
+      }).addTo(adminMap).bindPopup(`No.${item.pinId} · ${item.pinLabel}`).openPopup();
+      adminMap.setView([item.lat, item.lon], 17);
+    }
+
+    const detailPane = document.getElementById('detail-pane');
+    document.getElementById('detail-title').textContent = isNew ? '신규 제보 검토' : '오류 제보 검토';
+    document.getElementById('detail-info').innerHTML = isNew
+      ? `위치: ${item.lat?.toFixed(6)}, ${item.lon?.toFixed(6)}<br>제보자: ${item.nickname || '익명'}<br>${item.memo ? '메모: ' + item.memo : ''}`
+      : `핀: No.${item.pinId} · ${item.pinLabel}<br>오류유형: ${item.errorType}<br>제보자: ${item.nickname || '익명'}<br>${item.memo ? '메모: ' + item.memo : ''}`;
+    detailPane.style.display = 'block';
+
+    document.getElementById('btn-approve').onclick = () => updateStatus(item.id, col, 'approved');
+    document.getElementById('btn-reject').onclick  = () => updateStatus(item.id, col, 'rejected');
+  }
+
+  async function updateStatus(id, col, status) {
+    await db.collection(col).doc(id).update({ status });
+    document.getElementById('detail-pane').style.display = 'none';
+    selectedId = null;
+    loadTab(col);
+  }
+</script>
+</body>
+</html>

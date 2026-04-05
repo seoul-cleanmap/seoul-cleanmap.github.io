@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -673,6 +676,63 @@
     .search-item-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
     .search-item-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
     .search-highlight { color: var(--green); font-weight: 700; }
+    /* ── 제보 시스템 ── */
+    #report-modal {
+      position: fixed; inset: 0; z-index: 600;
+      background: rgba(0,0,0,0.45); backdrop-filter: blur(3px);
+      display: flex; align-items: center; justify-content: center;
+      animation: fadeIn 0.3s ease;
+    }
+    .rm-box {
+      background: var(--panel-bg); border-radius: 24px;
+      padding: 28px 24px 20px; max-width: 380px;
+      width: calc(100% - 40px);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+      animation: slideUp 0.3s ease;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .rm-title { font-size: 17px; font-weight: 800; color: var(--text-primary); margin-bottom: 14px; }
+    .rm-info-box {
+      font-size: 12px; color: var(--text-secondary);
+      background: var(--card-bg); border-radius: 8px;
+      padding: 8px 10px; margin-bottom: 14px; line-height: 1.6;
+    }
+    .rm-label { font-size: 12px; color: var(--text-secondary); margin: 10px 0 4px; }
+    .rm-input, .rm-select, .rm-textarea {
+      width: 100%; padding: 9px 10px;
+      border: 1px solid var(--border-strong); border-radius: 8px;
+      background: var(--card-bg); color: var(--text-primary);
+      font-size: 13px; font-family: inherit; box-sizing: border-box;
+    }
+    .rm-input:focus, .rm-select:focus, .rm-textarea:focus { outline: none; border-color: var(--green); }
+    .rm-textarea { resize: vertical; min-height: 70px; }
+    .rm-actions { margin-top: 18px; display: flex; gap: 8px; }
+    .rm-submit {
+      flex: 1; padding: 12px; background: var(--green); color: white;
+      border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .rm-submit:hover { background: #256644; }
+    .rm-submit:disabled { background: #aaa; cursor: default; }
+    .rm-cancel {
+      padding: 12px 16px; background: none; color: var(--text-secondary);
+      border: 1px solid var(--border-strong); border-radius: 12px; font-size: 14px; cursor: pointer;
+    }
+    .rm-cancel:hover { background: var(--card-bg); }
+    #btn-new-report {
+      width: 34px; height: 34px;
+      background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px;
+      font-size: 16px; line-height: 30px; text-align: center;
+      cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+    }
+    #btn-new-report:hover { background: #f4f4f4; }
+    body.dark #btn-new-report { background: var(--toggle-bg); border-color: var(--border-strong); }
+    .error-report-btn {
+      display: block; width: 100%; margin-top: 10px; padding: 8px;
+      background: none; border: 1px solid var(--border-strong);
+      border-radius: 8px; font-size: 12px; color: var(--text-muted);
+      cursor: pointer; text-align: center;
+    }
+    .error-report-btn:hover { color: #e53935; border-color: #e53935; }
     /* ── 패널 footer ── */
     .panel-footer {
       flex-shrink: 0;
@@ -923,6 +983,7 @@
       </div>
 
       <div class="detail-fields" id="detail-fields"></div>
+      <button class="error-report-btn" id="error-report-btn">⚠️ 이 핀의 오류 제보하기</button>
     </div>
 
   </div>
@@ -965,6 +1026,41 @@
   </div>
 </div>
 
+<!-- 제보 모달 -->
+<div id="report-modal" style="display:none;">
+  <div class="rm-box">
+    <div class="rm-title" id="rm-title">새 쓰레기통 제보</div>
+
+    <div id="rm-loc-wrap">
+      <div class="rm-label">위치</div>
+      <div class="rm-info-box" id="rm-loc-status">📍 현재 위치 가져오는 중...</div>
+    </div>
+
+    <div id="rm-pin-wrap" style="display:none;">
+      <div class="rm-label">대상 핀</div>
+      <div class="rm-info-box" id="rm-pin-info"></div>
+      <div class="rm-label">오류 유형</div>
+      <select class="rm-select" id="rm-error-type">
+        <option value="위치 오류">위치 오류 (다른 곳에 있음)</option>
+        <option value="존재하지 않음">핀이 없음 (실제로 없는 쓰레기통)</option>
+        <option value="정보 오류">정보 오류 (종류, 도로명 등 잘못됨)</option>
+        <option value="기타">기타</option>
+      </select>
+    </div>
+
+    <div class="rm-label">닉네임 <span style="color:var(--text-muted);">(선택)</span></div>
+    <input class="rm-input" id="rm-nickname" type="text" placeholder="익명" maxlength="20">
+
+    <div class="rm-label">메모 <span style="color:var(--text-muted);">(선택)</span></div>
+    <textarea class="rm-textarea" id="rm-memo" placeholder="추가 정보를 남겨주세요" maxlength="300"></textarea>
+
+    <div class="rm-actions">
+      <button class="rm-cancel" id="rm-cancel">취소</button>
+      <button class="rm-submit" id="rm-submit">제보하기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 로딩 -->
 <div id="loading">
   <div class="loading-spin">🗑️</div>
@@ -972,6 +1068,18 @@
 </div>
 
 <script>
+  // ── Firebase 초기화 ───────────────────────────────────
+  firebase.initializeApp({
+    apiKey: "AIzaSyCIZaB3qkNGcW-HVkRszAehjzvvs7Eb52E",
+    authDomain: "seoul-cleanmap.firebaseapp.com",
+    projectId: "seoul-cleanmap",
+    storageBucket: "seoul-cleanmap.firebasestorage.app",
+    messagingSenderId: "48323704997",
+    appId: "1:48323704997:web:1ca7ba27b735be3873f54c",
+    measurementId: "G-9WERXBJW0V"
+  });
+  const db = firebase.firestore();
+
   // ── 설정 ─────────────────────────────────────────────
   const SOURCES = [
     { name: '강남구', color: '#2e7d52', dongBg: 'rgba(30,90,58,0.88)' },
@@ -1063,6 +1171,21 @@
     }
   });
   new GotoMeControl().addTo(map);
+
+  // 신규 제보 버튼 (지도 우하단)
+  const NewReportControl = L.Control.extend({
+    options: { position: 'bottomright' },
+    onAdd() {
+      const btn = L.DomUtil.create('button', '');
+      btn.id = 'btn-new-report';
+      btn.title = '새 쓰레기통 제보';
+      btn.innerHTML = '📢';
+      L.DomEvent.on(btn, 'click', L.DomEvent.stopPropagation);
+      L.DomEvent.on(btn, 'click', () => openReportModal('new'));
+      return btn;
+    }
+  });
+  new NewReportControl().addTo(map);
   tileLayer = L.tileLayer(TILE_LIGHT, {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
     subdomains: 'abcd', maxZoom: 19,
@@ -1070,8 +1193,9 @@
   applyTheme(activeTheme);  // 타일 URL 반영
 
   // ── 상태 ─────────────────────────────────────────────
-  let allData       = [];
-  let markerCluster = null;
+  let allData          = [];
+  let markerCluster    = null;
+  let currentDetailItem = null;
   let dongLayer     = null;
   let myMarker      = null;
   let userLatLng    = null;
@@ -1124,6 +1248,7 @@
   document.getElementById('list-back').addEventListener('click', showDefault);
 
   function showDetail(item, fromList = false) {
+    currentDetailItem = item;
     if (!fromList) listContext = null;
     document.getElementById('view-default').style.display = 'none';
     document.getElementById('view-list').style.display    = 'none';
@@ -1466,6 +1591,91 @@
         `<p style="color:#e53935;font-size:14px;">데이터 로드 실패: ${err.message}</p>`;
     }
   }
+  // ── 제보 시스템 ──────────────────────────────────────
+  let reportMode = 'new';
+  let reportLatLng = null;
+
+  function openReportModal(mode) {
+    reportMode = mode;
+    reportLatLng = null;
+    document.getElementById('rm-nickname').value = '';
+    document.getElementById('rm-memo').value = '';
+    const submitBtn = document.getElementById('rm-submit');
+    submitBtn.disabled = false;
+    submitBtn.textContent = '제보하기';
+
+    if (mode === 'new') {
+      document.getElementById('rm-title').textContent = '새 쓰레기통 제보';
+      document.getElementById('rm-loc-wrap').style.display = 'block';
+      document.getElementById('rm-pin-wrap').style.display = 'none';
+      document.getElementById('rm-loc-status').textContent = '📍 현재 위치 가져오는 중...';
+      submitBtn.disabled = true;
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          reportLatLng = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+          const acc = Math.round(pos.coords.accuracy);
+          document.getElementById('rm-loc-status').textContent =
+            `📍 ${reportLatLng.lat.toFixed(6)}, ${reportLatLng.lon.toFixed(6)}  (오차 약 ${acc}m)`;
+          submitBtn.disabled = false;
+        },
+        () => {
+          document.getElementById('rm-loc-status').textContent =
+            '⚠️ 위치를 가져올 수 없습니다. 위치 권한을 허용해주세요.';
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      document.getElementById('rm-title').textContent = '오류 제보';
+      document.getElementById('rm-loc-wrap').style.display = 'none';
+      document.getElementById('rm-pin-wrap').style.display = 'block';
+      const p = currentDetailItem;
+      document.getElementById('rm-pin-info').textContent =
+        `No.${p._id} · ${p._addr || '?'} (${p._src.name})`;
+    }
+    document.getElementById('report-modal').style.display = 'flex';
+  }
+
+  document.getElementById('rm-cancel').addEventListener('click', () => {
+    document.getElementById('report-modal').style.display = 'none';
+  });
+
+  document.getElementById('rm-submit').addEventListener('click', async () => {
+    const submitBtn = document.getElementById('rm-submit');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '제출 중...';
+    const nickname = document.getElementById('rm-nickname').value.trim() || '익명';
+    const memo     = document.getElementById('rm-memo').value.trim();
+    try {
+      if (reportMode === 'new') {
+        await db.collection('submissions').add({
+          lat: reportLatLng.lat, lon: reportLatLng.lon,
+          nickname, memo, status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        const p = currentDetailItem;
+        await db.collection('error_reports').add({
+          pinId: p._id, pinLabel: p._addr || '?',
+          district: p._src.name,
+          lat: p._lat, lon: p._lon,
+          errorType: document.getElementById('rm-error-type').value,
+          nickname, memo, status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      document.getElementById('report-modal').style.display = 'none';
+      alert('제보해 주셔서 감사합니다! 검토 후 반영됩니다.');
+    } catch (err) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '제보하기';
+      alert('제출 오류: ' + err.message);
+    }
+  });
+
+  document.getElementById('error-report-btn').addEventListener('click', () => {
+    if (currentDetailItem) openReportModal('error');
+  });
+
   loadData();
 </script>
 </body>
