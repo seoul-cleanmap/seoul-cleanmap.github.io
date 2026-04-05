@@ -108,6 +108,26 @@
     }
     .btn-reject:hover { background: #fce4ec; }
     .detail-info { font-size: 12px; color: #666; margin-bottom: 12px; line-height: 1.7; }
+
+    /* 검수 탭 */
+    .rv-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+    .rv-bad     { background: #ffebee; color: #c62828; }
+    .rv-suspect { background: #fff3e0; color: #e65100; }
+    .rv-filter  { padding: 10px 14px; border-bottom: 1px solid #eee; display: flex; gap: 8px; }
+    .rv-filter-btn { padding: 4px 10px; border-radius: 16px; font-size: 12px; border: 1px solid #ddd; background: white; cursor: pointer; }
+    .rv-filter-btn.active { background: #2e7d52; color: white; border-color: #2e7d52; }
+    .rv-links { margin: 8px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+    .rv-link { font-size: 12px; color: #1565c0; text-decoration: none; padding: 4px 8px; border: 1px solid #1565c0; border-radius: 6px; }
+    .rv-link:hover { background: #e3f2fd; }
+    .rv-input-wrap { margin-top: 10px; }
+    .rv-input-wrap label { font-size: 12px; font-weight: 600; color: #555; display: block; margin-bottom: 4px; }
+    .rv-input-row { display: flex; gap: 6px; }
+    .rv-input-row input { flex: 1; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; }
+    .rv-input-row input:focus { outline: none; border-color: #2e7d52; }
+    .rv-submit-btn { padding: 8px 14px; background: #2e7d52; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .rv-msg { font-size: 12px; margin-top: 6px; min-height: 16px; }
+    .rv-msg.ok { color: #2e7d52; } .rv-msg.err { color: #e53935; }
+    .item-done { opacity: 0.35; }
   </style>
 </head>
 <body>
@@ -137,6 +157,9 @@
     <div class="tab" data-tab="error_reports">
       오류 제보 <span class="badge" id="badge-errors">0</span>
     </div>
+    <div class="tab" data-tab="review">
+      좌표 검수 <span class="badge" id="badge-review" style="background:#e65100;">0</span>
+    </div>
   </div>
   <div class="admin-body">
     <div class="list-pane" id="list-pane">
@@ -147,9 +170,27 @@
       <div class="detail-pane" id="detail-pane" style="display:none;">
         <h3 id="detail-title"></h3>
         <div class="detail-info" id="detail-info"></div>
-        <div class="action-row">
-          <button class="btn-approve" id="btn-approve">✅ 승인</button>
-          <button class="btn-reject" id="btn-reject">❌ 반려</button>
+        <!-- 신규/오류 제보 액션 -->
+        <div id="report-actions">
+          <div class="action-row">
+            <button class="btn-approve" id="btn-approve">✅ 승인</button>
+            <button class="btn-reject" id="btn-reject">❌ 반려</button>
+          </div>
+        </div>
+        <!-- 좌표 검수 액션 -->
+        <div id="review-actions" style="display:none;">
+          <div class="rv-links">
+            <a class="rv-link" id="rv-cur-link" href="#" target="_blank">📍 현재 위치</a>
+            <a class="rv-link" id="rv-kakao-link" href="#" target="_blank">🔵 카카오 비교</a>
+          </div>
+          <div class="rv-input-wrap">
+            <label>정확한 위치의 kko.to 링크</label>
+            <div class="rv-input-row">
+              <input type="url" id="rv-kko-input" placeholder="https://kko.to/...">
+              <button class="rv-submit-btn" id="rv-submit-btn">제출</button>
+            </div>
+          </div>
+          <div class="rv-msg" id="rv-msg"></div>
         </div>
       </div>
     </div>
@@ -214,7 +255,13 @@
         currentTab = tab.dataset.tab;
         selectedId = null;
         document.getElementById('detail-pane').style.display = 'none';
-        loadTab(currentTab);
+        if (currentTab === 'review') {
+          loadReview();
+        } else {
+          document.getElementById('report-actions').style.display = 'block';
+          document.getElementById('review-actions').style.display = 'none';
+          loadTab(currentTab);
+        }
       });
     });
   }
@@ -303,6 +350,116 @@
     document.getElementById('detail-pane').style.display = 'none';
     selectedId = null;
     loadTab(col);
+  }
+
+  // ── 좌표 검수 탭 ──────────────────────────────────────
+  let reviewItems = [];
+  let reviewFilter = 'BAD';
+  let doneIds = new Set();
+  let markerKakao = null;
+
+  async function loadReview() {
+    // Firestore에서 이미 제출된 항목 파악
+    const snap = await db.collection('coord_reviews').get();
+    doneIds = new Set(snap.docs.map(d => d.data().pinId));
+
+    const res = await fetch('./review_data.json');
+    reviewItems = await res.json();
+    document.getElementById('badge-review').textContent =
+      reviewItems.filter(r => r.status === 'BAD' && !doneIds.has(r.id)).length;
+    renderReview();
+  }
+
+  function renderReview() {
+    const pane = document.getElementById('list-pane');
+    const filtered = reviewItems.filter(r =>
+      reviewFilter === 'ALL' ? true : r.status === reviewFilter
+    );
+    pane.innerHTML = `
+      <div class="rv-filter">
+        <button class="rv-filter-btn ${reviewFilter==='BAD'?'active':''}" data-f="BAD">BAD ${reviewItems.filter(r=>r.status==='BAD').length}</button>
+        <button class="rv-filter-btn ${reviewFilter==='SUSPECT'?'active':''}" data-f="SUSPECT">SUSPECT ${reviewItems.filter(r=>r.status==='SUSPECT').length}</button>
+        <button class="rv-filter-btn ${reviewFilter==='ALL'?'active':''}" data-f="ALL">전체</button>
+      </div>`;
+    pane.querySelectorAll('.rv-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => { reviewFilter = btn.dataset.f; renderReview(); });
+    });
+    if (!filtered.length) {
+      pane.innerHTML += '<div class="list-empty">항목이 없습니다.</div>';
+      return;
+    }
+    filtered.forEach(item => {
+      const done = doneIds.has(item.id);
+      const div = document.createElement('div');
+      div.className = 'report-item' + (item.id === selectedId ? ' selected' : '') + (done ? ' item-done' : '');
+      div.innerHTML = `
+        <div class="ri-header">
+          <span class="rv-badge rv-${item.status.toLowerCase()}">${item.status}</span>
+          <span class="ri-time">${item.dist_m ? Math.round(item.dist_m).toLocaleString()+'m 오차' : '미검증'}</span>
+        </div>
+        <div class="ri-label">No.${item.id} · ${item.label}</div>
+        <div class="ri-sub">${item.district} · ${item.road}</div>
+        ${done ? '<div style="font-size:11px;color:#2e7d52;margin-top:3px;">✅ 제출됨</div>' : ''}`;
+      div.addEventListener('click', () => selectReviewItem(item));
+      pane.appendChild(div);
+    });
+  }
+
+  function selectReviewItem(item) {
+    selectedId = item.id;
+    renderReview();
+
+    if (markerCur)   { adminMap.removeLayer(markerCur);   markerCur = null; }
+    if (markerRef)   { adminMap.removeLayer(markerRef);    markerRef = null; }
+    if (markerKakao) { adminMap.removeLayer(markerKakao); markerKakao = null; }
+
+    // 현재 좌표 (빨간)
+    markerCur = L.marker([item.cur_lat, item.cur_lon], {
+      icon: L.divIcon({ html: '<div style="width:14px;height:14px;background:#e53935;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>', className:'', iconSize:[14,14], iconAnchor:[7,7] })
+    }).addTo(adminMap).bindPopup(`현재 좌표<br>No.${item.id} · ${item.label}`).openPopup();
+
+    // 카카오 교차검증 좌표 (파란) — 있을 때만
+    if (item.kakao_lat && item.kakao_lon) {
+      markerKakao = L.marker([item.kakao_lat, item.kakao_lon], {
+        icon: L.divIcon({ html: '<div style="width:14px;height:14px;background:#1565c0;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>', className:'', iconSize:[14,14], iconAnchor:[7,7] })
+      }).addTo(adminMap).bindPopup(`카카오 비교: ${item.kakao_name}`);
+    }
+
+    adminMap.setView([item.cur_lat, item.cur_lon], 17);
+
+    // 상세 패널
+    document.getElementById('report-actions').style.display = 'none';
+    document.getElementById('review-actions').style.display = 'block';
+    document.getElementById('detail-title').textContent = `No.${item.id} · ${item.label}`;
+    document.getElementById('detail-info').innerHTML =
+      `<span class="rv-badge rv-${item.status.toLowerCase()}">${item.status}</span> ${item.dist_m ? Math.round(item.dist_m).toLocaleString()+'m 오차' : ''}<br>` +
+      `${item.district} · ${item.road}`;
+    document.getElementById('rv-cur-link').href =
+      `https://map.kakao.com/link/map/${encodeURIComponent(item.label)},${item.cur_lat},${item.cur_lon}`;
+    document.getElementById('rv-kakao-link').href = item.kakao_lat
+      ? `https://map.kakao.com/link/map/${encodeURIComponent(item.kakao_name||'카카오비교')},${item.kakao_lat},${item.kakao_lon}`
+      : '#';
+    document.getElementById('rv-kko-input').value = '';
+    document.getElementById('rv-msg').textContent = '';
+    document.getElementById('detail-pane').style.display = 'block';
+
+    document.getElementById('rv-submit-btn').onclick = () => submitCorrection(item);
+  }
+
+  async function submitCorrection(item) {
+    const kko = document.getElementById('rv-kko-input').value.trim();
+    const msg = document.getElementById('rv-msg');
+    if (!kko.startsWith('http')) { msg.className = 'rv-msg err'; msg.textContent = 'kko.to 링크를 입력해주세요.'; return; }
+    msg.className = 'rv-msg'; msg.textContent = '제출 중...';
+    await db.collection('coord_reviews').add({
+      pinId: item.id, kkoTo: kko, status: 'pending',
+      district: item.district, label: item.label, road: item.road,
+      curLat: item.cur_lat, curLon: item.cur_lon,
+      submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    doneIds.add(item.id);
+    msg.className = 'rv-msg ok'; msg.textContent = '✅ 제출 완료';
+    renderReview();
   }
 </script>
 </body>
