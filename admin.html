@@ -9,6 +9,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; }
@@ -133,6 +134,43 @@
     .ps-search-wrap input { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; }
     .ps-search-wrap input:focus { outline: none; border-color: #2e7d52; }
     .ps-hint { padding: 40px 24px; text-align: center; color: #aaa; font-size: 13px; }
+    /* 설정 모달 */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 10000;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: white; border-radius: 14px; padding: 24px;
+      width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .modal-box h3 { font-size: 15px; margin-bottom: 16px; }
+    .modal-box label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; }
+    .modal-box input {
+      width: 100%; padding: 10px; border: 1px solid #ddd;
+      border-radius: 8px; font-size: 13px; margin-bottom: 8px;
+    }
+    .modal-box input:focus { outline: none; border-color: #2e7d52; }
+    .modal-hint { font-size: 11px; color: #888; margin-bottom: 16px; }
+    .modal-row { display: flex; gap: 8px; }
+    .modal-row button { flex: 1; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; }
+    .modal-save { background: #2e7d52; color: white; }
+    .modal-save:hover { background: #256644; }
+    .modal-cancel { background: white; color: #666; border: 1px solid #ddd !important; }
+    .modal-cancel:hover { background: #f5f5f5; }
+    /* 위치 수정 UI */
+    .lf-section { border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px; }
+    .lf-section label { font-size: 12px; font-weight: 600; color: #555; display: block; margin-bottom: 4px; }
+    .lf-input-row { display: flex; gap: 6px; margin-bottom: 6px; }
+    .lf-input-row input { flex: 1; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 12px; }
+    .lf-input-row input:focus { outline: none; border-color: #1565c0; }
+    .lf-preview-btn { padding: 8px 12px; background: #1565c0; color: white; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .lf-preview-btn:hover { background: #0d47a1; }
+    .lf-kko-link { font-size: 12px; color: #1565c0; text-decoration: none; padding: 3px 8px; border: 1px solid #1565c0; border-radius: 6px; display: inline-block; margin-bottom: 6px; }
+    .lf-kko-link:hover { background: #e3f2fd; }
+    .lf-coords { font-size: 11px; color: #2e7d52; font-weight: 600; min-height: 16px; }
+    .lf-coords.err { color: #e53935; }
   </style>
 </head>
 <body>
@@ -153,7 +191,10 @@
 <div id="admin-screen">
   <header>
     <h1>서울 클린맵 관리자</h1>
-    <button class="logout-btn" id="logout-btn">로그아웃</button>
+    <div style="display:flex;gap:8px;">
+      <button class="logout-btn" id="settings-btn">⚙️ 설정</button>
+      <button class="logout-btn" id="logout-btn">로그아웃</button>
+    </div>
   </header>
   <div class="tabs">
     <div class="tab active" data-tab="submissions">
@@ -178,12 +219,23 @@
       <div class="detail-pane" id="detail-pane" style="display:none;">
         <h3 id="detail-title"></h3>
         <div class="detail-info" id="detail-info"></div>
+        <!-- 위치 수정 UI (오류 제보 - 위치 오류 시) -->
+        <div id="location-fix-ui" style="display:none;" class="lf-section">
+          <a id="lf-kko-link" class="lf-kko-link" href="#" target="_blank" style="display:none;">제보된 kko.to 링크 열기</a>
+          <label>정확한 위치 Kakao URL 붙여넣기</label>
+          <div class="lf-input-row">
+            <input type="url" id="lf-kakao-url" placeholder="kko.to 열면 리다이렉트되는 카카오 URL...">
+            <button class="lf-preview-btn" id="lf-preview-btn">미리보기</button>
+          </div>
+          <div class="lf-coords" id="lf-coords"></div>
+        </div>
         <!-- 신규/오류 제보 액션 -->
         <div id="report-actions">
           <div class="action-row">
             <button class="btn-approve" id="btn-approve">✅ 승인</button>
             <button class="btn-reject" id="btn-reject">❌ 반려</button>
           </div>
+          <div id="approve-status" style="font-size:12px;color:#2e7d52;margin-top:6px;min-height:16px;"></div>
         </div>
         <!-- 좌표 검수 액션 -->
         <div id="review-actions" style="display:none;">
@@ -205,6 +257,21 @@
   </div>
 </div>
 
+<!-- 설정 모달 -->
+<div id="settings-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>⚙️ 설정</h3>
+    <label>GitHub Personal Access Token</label>
+    <input type="password" id="settings-pat" placeholder="ghp_...">
+    <div class="modal-hint">GitHub → Settings → Developer settings → Personal access tokens (Classic)<br>필요 권한: <strong>repo</strong> (Contents write)</div>
+    <div id="settings-pat-status" style="font-size:12px;margin-bottom:12px;"></div>
+    <div class="modal-row">
+      <button class="modal-save" id="settings-save-btn">저장</button>
+      <button class="modal-cancel" id="settings-cancel-btn">취소</button>
+    </div>
+  </div>
+</div>
+
 <script>
   firebase.initializeApp({
     apiKey: "AIzaSyCIZaB3qkNGcW-HVkRszAehjzvvs7Eb52E",
@@ -216,6 +283,79 @@
   });
   const db   = firebase.firestore();
   const auth = firebase.auth();
+
+  // ── 좌표 변환 (WCONGNAMUL → WGS84) ──────────────────────
+  proj4.defs('EPSG:5181',
+    '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=GRS80 +units=m +no_defs');
+
+  function wcToWgs(urlX, urlY) {
+    // WCONGNAMUL = EPSG:5181 × 2.5
+    const [lon, lat] = proj4('EPSG:5181', 'WGS84', [urlX / 2.5, urlY / 2.5]);
+    return { lat, lon };
+  }
+
+  function parseKakaoUrl(url) {
+    try {
+      // urlX/urlY 파라미터 (WCONGNAMUL 좌표계)
+      const mx = url.match(/[?&]urlX=(\d+\.?\d*)/);
+      const my = url.match(/[?&]urlY=(\d+\.?\d*)/);
+      if (mx && my) return wcToWgs(parseFloat(mx[1]), parseFloat(my[1]));
+      // /roadview/lat,lon 형식
+      const rm = url.match(/\/roadview\/(-?\d+\.?\d+),(-?\d+\.?\d+)/);
+      if (rm) return { lat: parseFloat(rm[1]), lon: parseFloat(rm[2]) };
+      // ,lat,lon 형식 (map link)
+      const mm = url.match(/,(-?\d{2}\.\d+),(-?\d{3}\.\d+)/);
+      if (mm) return { lat: parseFloat(mm[1]), lon: parseFloat(mm[2]) };
+    } catch(e) {}
+    return null;
+  }
+
+  // ── GitHub API ────────────────────────────────────────────
+  const GITHUB_REPO = 'seoul-cleanmap/seoul-cleanmap.github.io';
+
+  async function applyGitHubUpdate(pinId, newLat, newLon) {
+    const pat = sessionStorage.getItem('github_pat');
+    if (!pat) throw new Error('GitHub PAT가 설정되지 않았습니다. (⚙️ 설정 버튼)');
+
+    const headers = {
+      Authorization: `token ${pat}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json'
+    };
+
+    // 1. 현재 data.json 조회
+    const res = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/contents/data.json`, { headers });
+    if (!res.ok) throw new Error(`data.json 조회 실패 (${res.status})`);
+    const fileInfo = await res.json();
+
+    // 2. 디코딩 및 핀 수정
+    const raw = atob(fileInfo.content.replace(/\s/g, ''));
+    const data = JSON.parse(raw);
+    const pin = data.find(p => String(p.id) === String(pinId));
+    if (!pin) throw new Error(`핀 No.${pinId}를 data.json에서 찾을 수 없습니다.`);
+
+    const oldLat = pin.lat, oldLon = pin.lon;
+    pin.lat = newLat;
+    pin.lon = newLon;
+    pin.geocode = 'manual';
+
+    // 3. 수정 후 커밋
+    const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+    const putRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/contents/data.json`, {
+        method: 'PUT', headers,
+        body: JSON.stringify({
+          message: `좌표 수정: No.${pinId} 오류제보 승인 (${oldLat.toFixed(6)},${oldLon.toFixed(6)} → ${newLat.toFixed(6)},${newLon.toFixed(6)})`,
+          content: newContent,
+          sha: fileInfo.sha
+        })
+      });
+    if (!putRes.ok) {
+      const err = await putRes.json().catch(() => ({}));
+      throw new Error(`GitHub 업데이트 실패: ${putRes.status} ${err.message || ''}`);
+    }
+  }
 
   // ── 로그인 ──
   document.getElementById('login-btn').addEventListener('click', async () => {
@@ -237,8 +377,36 @@
     if (user) initAdmin();
   });
 
+  // ── 설정 모달 ────────────────────────────────────────────
+  function openSettings() {
+    const modal = document.getElementById('settings-modal');
+    const patInput = document.getElementById('settings-pat');
+    const status = document.getElementById('settings-pat-status');
+    const saved = sessionStorage.getItem('github_pat');
+    patInput.value = saved ? '••••••••••••••••' : '';
+    status.textContent = saved ? '✅ PAT 저장됨' : '⚠️ PAT 미설정';
+    status.style.color = saved ? '#2e7d52' : '#e65100';
+    modal.classList.add('open');
+  }
+  document.getElementById('settings-btn').addEventListener('click', openSettings);
+  document.getElementById('settings-cancel-btn').addEventListener('click', () => {
+    document.getElementById('settings-modal').classList.remove('open');
+  });
+  document.getElementById('settings-save-btn').addEventListener('click', () => {
+    const val = document.getElementById('settings-pat').value.trim();
+    if (val && !val.startsWith('•')) {
+      sessionStorage.setItem('github_pat', val);
+      const status = document.getElementById('settings-pat-status');
+      status.textContent = '✅ 저장됨';
+      status.style.color = '#2e7d52';
+      setTimeout(() => document.getElementById('settings-modal').classList.remove('open'), 800);
+    } else {
+      document.getElementById('settings-modal').classList.remove('open');
+    }
+  });
+
   // ── 지도 초기화 ──
-  let adminMap, markerCur, markerRef;
+  let adminMap, markerCur, markerRef, markerCorrect;
   function initMap() {
     if (adminMap) return;
     adminMap = L.map('admin-map').setView([37.555, 126.98], 13);
@@ -328,24 +496,32 @@
     });
   }
 
+  let correctedCoords = null; // 위치 오류 수정 좌표
+
   function selectItem(item, col) {
     selectedId = item.id;
+    correctedCoords = null;
     renderList(allItems, col);
 
-    if (markerCur) { adminMap.removeLayer(markerCur); markerCur = null; }
-    if (markerRef)  { adminMap.removeLayer(markerRef);  markerRef = null; }
+    if (markerCur)     { adminMap.removeLayer(markerCur);     markerCur = null; }
+    if (markerRef)     { adminMap.removeLayer(markerRef);     markerRef = null; }
+    if (markerCorrect) { adminMap.removeLayer(markerCorrect); markerCorrect = null; }
 
     const isNew = col === 'submissions';
+    const isLocationError = !isNew && item.errorType && item.errorType.includes('위치');
+
     if (isNew) {
       markerCur = L.marker([item.lat, item.lon], {
         icon: L.divIcon({ html: '<div style="width:14px;height:14px;background:#1565c0;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>', className: '', iconSize:[14,14], iconAnchor:[7,7] })
       }).addTo(adminMap).bindPopup(`신규 제보<br>${item.nickname || '익명'}`).openPopup();
       adminMap.setView([item.lat, item.lon], 17);
     } else {
-      markerRef = L.marker([item.lat, item.lon], {
-        icon: L.divIcon({ html: '<div style="width:14px;height:14px;background:#e53935;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>', className: '', iconSize:[14,14], iconAnchor:[7,7] })
-      }).addTo(adminMap).bindPopup(`No.${item.pinId} · ${item.pinLabel}`).openPopup();
-      adminMap.setView([item.lat, item.lon], 17);
+      if (item.lat && item.lon) {
+        markerRef = L.marker([item.lat, item.lon], {
+          icon: L.divIcon({ html: '<div style="width:14px;height:14px;background:#e53935;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>', className: '', iconSize:[14,14], iconAnchor:[7,7] })
+        }).addTo(adminMap).bindPopup(`현재 위치<br>No.${item.pinId} · ${item.pinLabel}`).openPopup();
+        adminMap.setView([item.lat, item.lon], 17);
+      }
     }
 
     const detailPane = document.getElementById('detail-pane');
@@ -353,10 +529,97 @@
     document.getElementById('detail-info').innerHTML = isNew
       ? `위치: ${item.lat?.toFixed(6)}, ${item.lon?.toFixed(6)}<br>제보자: ${item.nickname || '익명'}<br>${item.memo ? '메모: ' + item.memo : ''}`
       : `핀: No.${item.pinId} · ${item.pinLabel}<br>오류유형: ${item.errorType}<br>제보자: ${item.nickname || '익명'}<br>${item.memo ? '메모: ' + item.memo : ''}`;
+
+    // 위치 수정 UI 설정
+    const lfUi = document.getElementById('location-fix-ui');
+    if (isLocationError) {
+      lfUi.style.display = 'block';
+      document.getElementById('lf-kakao-url').value = '';
+      document.getElementById('lf-coords').textContent = '';
+      // 제보자가 kko.to를 함께 제출했으면 링크 표시
+      const kkoLink = document.getElementById('lf-kko-link');
+      if (item.kkoTo) {
+        kkoLink.href = item.kkoTo;
+        kkoLink.style.display = 'inline-block';
+      } else {
+        kkoLink.style.display = 'none';
+      }
+    } else {
+      lfUi.style.display = 'none';
+    }
+
+    document.getElementById('approve-status').textContent = '';
     detailPane.style.display = 'block';
 
-    document.getElementById('btn-approve').onclick = () => updateStatus(item.id, col, 'approved');
-    document.getElementById('btn-reject').onclick  = () => updateStatus(item.id, col, 'rejected');
+    // 미리보기 버튼
+    document.getElementById('lf-preview-btn').onclick = () => {
+      const url = document.getElementById('lf-kakao-url').value.trim();
+      const coordsEl = document.getElementById('lf-coords');
+      if (!url) { coordsEl.className = 'lf-coords err'; coordsEl.textContent = 'URL을 입력해주세요.'; return; }
+      const coords = parseKakaoUrl(url);
+      if (!coords) {
+        coordsEl.className = 'lf-coords err';
+        coordsEl.textContent = 'URL에서 좌표를 찾을 수 없습니다.';
+        correctedCoords = null;
+        return;
+      }
+      correctedCoords = coords;
+      coordsEl.className = 'lf-coords';
+      coordsEl.textContent = `→ ${coords.lat.toFixed(6)}, ${coords.lon.toFixed(6)}`;
+      // 파란 마커 표시
+      if (markerCorrect) { adminMap.removeLayer(markerCorrect); markerCorrect = null; }
+      markerCorrect = L.marker([coords.lat, coords.lon], {
+        icon: L.divIcon({ html: '<div style="width:14px;height:14px;background:#1565c0;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>', className:'', iconSize:[14,14], iconAnchor:[7,7] })
+      }).addTo(adminMap).bindPopup('수정 위치').openPopup();
+      if (markerRef) {
+        adminMap.fitBounds([[item.lat, item.lon],[coords.lat, coords.lon]], { padding: [40, 40] });
+      } else {
+        adminMap.setView([coords.lat, coords.lon], 17);
+      }
+    };
+
+    // 승인 버튼
+    document.getElementById('btn-approve').onclick = async () => {
+      const statusEl = document.getElementById('approve-status');
+      if (isLocationError) {
+        if (!correctedCoords) {
+          statusEl.style.color = '#e53935';
+          statusEl.textContent = '먼저 URL을 붙여넣고 미리보기를 확인해주세요.';
+          return;
+        }
+        const pat = sessionStorage.getItem('github_pat');
+        if (!pat) {
+          statusEl.style.color = '#e53935';
+          statusEl.textContent = '⚙️ 설정에서 GitHub PAT를 먼저 입력해주세요.';
+          return;
+        }
+        const btn = document.getElementById('btn-approve');
+        btn.disabled = true;
+        btn.textContent = '업데이트 중...';
+        statusEl.style.color = '#2e7d52';
+        statusEl.textContent = 'data.json 업데이트 중...';
+        try {
+          await applyGitHubUpdate(item.pinId, correctedCoords.lat, correctedCoords.lon);
+          statusEl.textContent = '✅ data.json 업데이트 완료! Firestore 처리 중...';
+          await db.collection(col).doc(item.id).update({ status: 'approved' });
+          document.getElementById('detail-pane').style.display = 'none';
+          selectedId = null;
+          loadTab(col);
+        } catch(e) {
+          statusEl.style.color = '#e53935';
+          statusEl.textContent = '오류: ' + e.message;
+          btn.disabled = false;
+          btn.textContent = '✅ 승인';
+        }
+      } else {
+        await db.collection(col).doc(item.id).update({ status: 'approved' });
+        document.getElementById('detail-pane').style.display = 'none';
+        selectedId = null;
+        loadTab(col);
+      }
+    };
+
+    document.getElementById('btn-reject').onclick = () => updateStatus(item.id, col, 'rejected');
   }
 
   async function updateStatus(id, col, status) {
@@ -436,9 +699,10 @@
     selectedId = item.id;
     renderReview();
 
-    if (markerCur)   { adminMap.removeLayer(markerCur);   markerCur = null; }
-    if (markerRef)   { adminMap.removeLayer(markerRef);    markerRef = null; }
-    if (markerKakao) { adminMap.removeLayer(markerKakao); markerKakao = null; }
+    if (markerCur)     { adminMap.removeLayer(markerCur);     markerCur = null; }
+    if (markerRef)     { adminMap.removeLayer(markerRef);     markerRef = null; }
+    if (markerKakao)   { adminMap.removeLayer(markerKakao);   markerKakao = null; }
+    if (markerCorrect) { adminMap.removeLayer(markerCorrect); markerCorrect = null; }
 
     // 현재 좌표 (빨간)
     markerCur = L.marker([item.cur_lat, item.cur_lon], {
@@ -548,8 +812,10 @@
     renderPinResults(document.getElementById('ps-results').querySelectorAll('.report-item').length
       ? allPins.filter(x => document.getElementById('ps-results').querySelector(`[data-id="${x.id}"]`)) : []);
 
-    if (markerCur)   { adminMap.removeLayer(markerCur);   markerCur = null; }
-    if (markerKakao) { adminMap.removeLayer(markerKakao); markerKakao = null; }
+    if (markerCur)     { adminMap.removeLayer(markerCur);     markerCur = null; }
+    if (markerRef)     { adminMap.removeLayer(markerRef);     markerRef = null; }
+    if (markerKakao)   { adminMap.removeLayer(markerKakao);   markerKakao = null; }
+    if (markerCorrect) { adminMap.removeLayer(markerCorrect); markerCorrect = null; }
 
     markerCur = L.marker([p.lat, p.lon], {
       icon: L.divIcon({ html: '<div style="width:14px;height:14px;background:#e53935;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>', className:'', iconSize:[14,14], iconAnchor:[7,7] })
