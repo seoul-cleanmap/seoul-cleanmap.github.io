@@ -212,7 +212,10 @@
     <div class="tab" data-tab="correction-log">
       전체 핀 <span class="badge" id="badge-corrections" style="background:#607d8b;">0</span>
     </div>
-    <button id="claude-copy-btn" style="margin-left:auto;margin-right:8px;align-self:center;padding:5px 12px;background:#1a3a2a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📋 수정 요청 복사 <span id="pending-badge" style="display:none;background:#e65100;color:white;font-size:10px;padding:1px 5px;border-radius:8px;margin-left:3px;">0</span></button>
+    <div style="margin-left:auto;display:flex;gap:6px;align-items:center;margin-right:8px;">
+      <button id="claude-copy-btn" style="padding:5px 12px;background:#1a3a2a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📋 수정 요청 복사 <span id="pending-badge" style="display:none;background:#e65100;color:white;font-size:10px;padding:1px 5px;border-radius:8px;margin-left:3px;">0</span></button>
+      <button id="pending-done-btn" style="display:none;padding:5px 12px;background:#e65100;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✅ 완료 처리</button>
+    </div>
   </div>
   <div class="admin-body">
     <div class="list-pane" id="list-pane">
@@ -886,6 +889,8 @@
     const badge = document.getElementById('pending-badge');
     badge.textContent = count;
     badge.style.display = count > 0 ? 'inline' : 'none';
+    const doneBtn = document.getElementById('pending-done-btn');
+    if (doneBtn) doneBtn.style.display = count > 0 ? 'inline-block' : 'none';
   }
   savePending(); // 초기 뱃지 반영
 
@@ -1058,6 +1063,45 @@
 
     document.getElementById('detail-pane').style.display = 'block';
   }
+
+  // 완료 처리: 예약 목록 → Firestore pin_corrections 기록 후 localStorage 초기화
+  document.getElementById('pending-done-btn').addEventListener('click', async function() {
+    const entries = Object.entries(pendingCorrections);
+    if (!entries.length) return;
+    this.disabled = true;
+    this.textContent = '처리 중...';
+    try {
+      const batch = db.batch();
+      entries.forEach(([pinId, v]) => {
+        const pin = allPins.find(p => p.id === pinId);
+        const ref = db.collection('pin_corrections').doc();
+        batch.set(ref, {
+          pinId,
+          pinLabel: v.label || pin?.label || '',
+          district: v.district || pin?.district || '',
+          road: pin?.road || '',
+          newLat: pin?.lat ?? null,
+          newLon: pin?.lon ?? null,
+          kkoTo: v.kkoTo,
+          note: 'Claude 수정 반영',
+          correctedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+      await batch.commit();
+      pendingCorrections = {};
+      savePending();
+      // 이력 캐시 갱신 후 목록 재렌더
+      const snap = await db.collection('pin_corrections').orderBy('correctedAt','desc').get();
+      clLogEntries = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+      renderCorrectionList(allPins, document.getElementById('cl-input')?.value?.trim().toLowerCase() || '');
+      this.textContent = '✅ 완료 처리';
+      setTimeout(() => { this.textContent = '✅ 완료 처리'; this.disabled = false; }, 1500);
+    } catch(e) {
+      alert('오류: ' + e.message);
+      this.disabled = false;
+      this.textContent = '✅ 완료 처리';
+    }
+  });
 
   document.getElementById('claude-copy-btn').addEventListener('click', function() {
     const entries = Object.entries(pendingCorrections);
