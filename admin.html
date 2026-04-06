@@ -214,7 +214,7 @@
     </div>
     <div style="margin-left:auto;display:flex;gap:6px;align-items:center;margin-right:8px;">
       <button id="claude-copy-btn" style="padding:5px 12px;background:#1a3a2a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📋 수정 요청 복사 <span id="pending-badge" style="display:none;background:#e65100;color:white;font-size:10px;padding:1px 5px;border-radius:8px;margin-left:3px;">0</span></button>
-      <button id="pending-done-btn" style="display:none;padding:5px 12px;background:#e65100;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✅ 완료 처리</button>
+      <button id="pending-done-btn" style="display:none;padding:5px 12px;background:#e65100;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✅ 전체 완료</button>
     </div>
   </div>
   <div class="admin-body">
@@ -259,6 +259,9 @@
               <button class="lf-preview-btn" id="log-reserve-btn" style="background:#e65100;">예약</button>
             </div>
             <div id="log-pending-msg" style="font-size:11px;margin-top:4px;min-height:14px;"></div>
+          </div>
+          <div id="log-single-done-wrap" style="display:none;margin-top:8px;">
+            <button id="log-single-done-btn" style="width:100%;padding:9px;background:#e65100;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">✅ 이 핀 완료 처리</button>
           </div>
         </div>
         <!-- 좌표 검수 액션 -->
@@ -1045,8 +1048,11 @@
         pendingMsg.textContent = '';
       }
       savePending();
+      updateSingleDoneBtn(p);
       renderCorrectionList(allPins, document.getElementById('cl-input')?.value?.trim().toLowerCase() || '');
     };
+
+    updateSingleDoneBtn(p);
 
     const histEl = document.getElementById('log-history');
     if (!logs.length) {
@@ -1064,7 +1070,56 @@
     document.getElementById('detail-pane').style.display = 'block';
   }
 
-  // 완료 처리: 예약 목록 → Firestore pin_corrections 기록 후 localStorage 초기화
+  // 개별 완료 버튼 표시 제어
+  function updateSingleDoneBtn(p) {
+    const wrap = document.getElementById('log-single-done-wrap');
+    const btn  = document.getElementById('log-single-done-btn');
+    if (pendingCorrections[p.id]) {
+      wrap.style.display = 'block';
+      btn.onclick = () => completeSinglePin(p);
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
+
+  async function completeSinglePin(p) {
+    const btn = document.getElementById('log-single-done-btn');
+    btn.disabled = true; btn.textContent = '처리 중...';
+    try {
+      const entry = pendingCorrections[p.id];
+      await db.collection('pin_corrections').add({
+        pinId: p.id, pinLabel: p.label || '', district: p.district || '', road: p.road || '',
+        newLat: p.lat ?? null, newLon: p.lon ?? null,
+        kkoTo: entry.kkoTo, note: 'Claude 수정 반영',
+        correctedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      delete pendingCorrections[p.id];
+      savePending();
+      // 이력 캐시 갱신
+      const snap = await db.collection('pin_corrections').orderBy('correctedAt','desc').get();
+      clLogEntries = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+      document.getElementById('log-single-done-wrap').style.display = 'none';
+      document.getElementById('log-pending-msg').style.color = '#2e7d52';
+      document.getElementById('log-pending-msg').textContent = '✅ 완료 처리됨';
+      document.getElementById('log-kko-input').value = '';
+      // 이력 섹션 재렌더
+      const logs = clLogEntries.filter(e => String(e.pinId) === String(p.id));
+      const histEl = document.getElementById('log-history');
+      histEl.innerHTML = logs.map(l => `
+        <div style="font-size:11px;background:#f0f7f3;border-radius:8px;padding:7px 10px;margin-bottom:6px;line-height:1.6;">
+          <div style="font-weight:700;color:#2e7d52;">${fmtTime(l.correctedAt) || '날짜 미상'}</div>
+          <div style="color:#555;">${l.note || '좌표 수정'}</div>
+          ${l.oldLat ? `<div style="color:#999;">${(+l.oldLat).toFixed(6)}, ${(+l.oldLon).toFixed(6)} → ${(+l.newLat).toFixed(6)}, ${(+l.newLon).toFixed(6)}</div>` : ''}
+          ${l.kkoTo ? `<a href="${l.kkoTo}" target="_blank" style="color:#1565c0;font-size:11px;">kko.to 링크</a>` : ''}
+        </div>`).join('');
+      renderCorrectionList(allPins, document.getElementById('cl-input')?.value?.trim().toLowerCase() || '');
+    } catch(e) {
+      alert('오류: ' + e.message);
+      btn.disabled = false; btn.textContent = '✅ 이 핀 완료 처리';
+    }
+  }
+
+  // 전체 완료 처리
   document.getElementById('pending-done-btn').addEventListener('click', async function() {
     const entries = Object.entries(pendingCorrections);
     if (!entries.length) return;
@@ -1090,12 +1145,13 @@
       await batch.commit();
       pendingCorrections = {};
       savePending();
+      document.getElementById('log-single-done-wrap').style.display = 'none';
       // 이력 캐시 갱신 후 목록 재렌더
       const snap = await db.collection('pin_corrections').orderBy('correctedAt','desc').get();
       clLogEntries = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
       renderCorrectionList(allPins, document.getElementById('cl-input')?.value?.trim().toLowerCase() || '');
-      this.textContent = '✅ 완료 처리';
-      setTimeout(() => { this.textContent = '✅ 완료 처리'; this.disabled = false; }, 1500);
+      this.textContent = '✅ 전체 완료';
+      setTimeout(() => { this.textContent = '✅ 전체 완료'; this.disabled = false; }, 1500);
     } catch(e) {
       alert('오류: ' + e.message);
       this.disabled = false;
