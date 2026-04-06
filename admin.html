@@ -278,13 +278,17 @@
 
   function loadTab(col) {
     document.getElementById('list-pane').innerHTML = '<div class="list-empty">로딩 중...</div>';
-    db.collection(col).where('status', '==', 'pending')
-      .orderBy('createdAt', 'desc').get()
+    db.collection(col).where('status', '==', 'pending').get()
       .then(snap => {
         allItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        allItems.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         const badgeId = col === 'submissions' ? 'badge-submissions' : 'badge-errors';
         document.getElementById(badgeId).textContent = allItems.length;
         renderList(allItems, col);
+      })
+      .catch(e => {
+        document.getElementById('list-pane').innerHTML =
+          `<div class="list-empty" style="color:#e53935;">로드 실패<br><small>${e.message}</small></div>`;
       });
   }
 
