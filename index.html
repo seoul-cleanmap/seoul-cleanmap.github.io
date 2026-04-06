@@ -1697,7 +1697,18 @@
       renderMarkers();
       updateDashboard();
       setMobileState('overview');
-      document.getElementById('location-modal').style.display = 'flex';
+
+      // ── URL 딥링크: ?pin=0001 ──
+      const urlPin = new URLSearchParams(location.search).get('pin');
+      if (urlPin) {
+        const target = allData.find(d => d._id === urlPin);
+        if (target) {
+          map.flyTo([target._lat, target._lon], 17, { animate: false });
+          showDetail(target);
+        }
+      } else {
+        document.getElementById('location-modal').style.display = 'flex';
+      }
     } catch (err) {
       console.error(err);
       document.getElementById('loading').innerHTML =

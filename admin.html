@@ -247,6 +247,7 @@
           <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
             <a id="log-map-link" href="#" target="_blank" class="rv-link">지도에서 보기</a>
             <a id="log-roadview-link" href="#" target="_blank" class="rv-link">카카오 로드뷰</a>
+            <a id="log-deploy-link" href="#" target="_blank" class="rv-link" style="background:#2e7d52;color:white;border-color:#2e7d52;">배포 페이지</a>
           </div>
           <div class="lf-section" style="margin-top:10px;">
             <label>수정 예약 (kko.to)</label>
@@ -1013,6 +1014,8 @@
       `https://map.kakao.com/link/map/${encodeURIComponent(p.label)},${p.lat},${p.lon}`;
     document.getElementById('log-roadview-link').href =
       `https://map.kakao.com/link/roadview/${p.lat},${p.lon}`;
+    document.getElementById('log-deploy-link').href =
+      `https://seoul-cleanmap.github.io?pin=${p.id}`;
 
     // 예약 입력 초기화
     const kkoInput = document.getElementById('log-kko-input');
